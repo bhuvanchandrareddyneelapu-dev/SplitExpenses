@@ -1,0 +1,5 @@
+﻿target/
+jdk-26/
+apache-maven-3.9.6/
+*.class
+*.log

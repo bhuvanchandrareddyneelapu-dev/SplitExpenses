@@ -1,0 +1,1677 @@
+﻿{
+    "openapi":  "3.1.0",
+    "info":  {
+                 "title":  "SplitWiseMoney API",
+                 "description":  "SplitWiseMoney - Expense sharing web application API documentation",
+                 "version":  "1.0"
+             },
+    "servers":  [
+                    {
+                        "url":  "http://localhost:8080",
+                        "description":  "Generated server url"
+                    }
+                ],
+    "security":  [
+                     {
+                         "bearerAuth":  [
+
+                                        ]
+                     }
+                 ],
+    "tags":  [
+                 {
+                     "name":  "Expenses",
+                     "description":  "Endpoints for managing group expenses and participant splits"
+                 },
+                 {
+                     "name":  "Settlements",
+                     "description":  "Endpoints for debt simplification calculations and payment tracking"
+                 },
+                 {
+                     "name":  "Authentication",
+                     "description":  "Endpoints for user registration and login"
+                 },
+                 {
+                     "name":  "Notifications",
+                     "description":  "Endpoints for managing user alerts and notifications"
+                 },
+                 {
+                     "name":  "Users",
+                     "description":  "Endpoints for managing user profile and settings"
+                 },
+                 {
+                     "name":  "Dashboard",
+                     "description":  "Endpoints for user financial overview metrics"
+                 },
+                 {
+                     "name":  "Groups",
+                     "description":  "Endpoints for managing group configurations and group memberships"
+                 },
+                 {
+                     "name":  "History",
+                     "description":  "Endpoints for user activity logs history"
+                 }
+             ],
+    "paths":  {
+                  "/api/users/me":  {
+                                        "get":  {
+                                                    "tags":  [
+                                                                 "Users"
+                                                             ],
+                                                    "summary":  "Get current logged in user details",
+                                                    "operationId":  "getCurrentUser",
+                                                    "responses":  {
+                                                                      "200":  {
+                                                                                  "description":  "OK",
+                                                                                  "content":  {
+                                                                                                  "*/*":  {
+                                                                                                              "schema":  {
+                                                                                                                             "$ref":  "#/components/schemas/UserProfile"
+                                                                                                                         }
+                                                                                                          }
+                                                                                              }
+                                                                              }
+                                                                  },
+                                                    "security":  [
+                                                                     {
+                                                                         "bearerAuth":  [
+
+                                                                                        ]
+                                                                     }
+                                                                 ]
+                                                },
+                                        "put":  {
+                                                    "tags":  [
+                                                                 "Users"
+                                                             ],
+                                                    "summary":  "Update current user profile name",
+                                                    "operationId":  "updateProfile",
+                                                    "requestBody":  {
+                                                                        "content":  {
+                                                                                        "application/json":  {
+                                                                                                                 "schema":  {
+                                                                                                                                "$ref":  "#/components/schemas/UpdateProfileRequest"
+                                                                                                                            }
+                                                                                                             }
+                                                                                    },
+                                                                        "required":  true
+                                                                    },
+                                                    "responses":  {
+                                                                      "200":  {
+                                                                                  "description":  "OK",
+                                                                                  "content":  {
+                                                                                                  "*/*":  {
+                                                                                                              "schema":  {
+                                                                                                                             "$ref":  "#/components/schemas/UserProfile"
+                                                                                                                         }
+                                                                                                          }
+                                                                                              }
+                                                                              }
+                                                                  },
+                                                    "security":  [
+                                                                     {
+                                                                         "bearerAuth":  [
+
+                                                                                        ]
+                                                                     }
+                                                                 ]
+                                                }
+                                    },
+                  "/api/settlements/{settlementId}/settle":  {
+                                                                 "put":  {
+                                                                             "tags":  [
+                                                                                          "Settlements"
+                                                                                      ],
+                                                                             "summary":  "Mark a pending settlement payment as SETTLED",
+                                                                             "operationId":  "markAsSettled",
+                                                                             "parameters":  [
+                                                                                                {
+                                                                                                    "name":  "settlementId",
+                                                                                                    "in":  "path",
+                                                                                                    "required":  true,
+                                                                                                    "schema":  {
+                                                                                                                   "type":  "integer",
+                                                                                                                   "format":  "int64"
+                                                                                                               }
+                                                                                                }
+                                                                                            ],
+                                                                             "responses":  {
+                                                                                               "200":  {
+                                                                                                           "description":  "OK",
+                                                                                                           "content":  {
+                                                                                                                           "*/*":  {
+                                                                                                                                       "schema":  {
+                                                                                                                                                      "$ref":  "#/components/schemas/SettlementResponse"
+                                                                                                                                                  }
+                                                                                                                                   }
+                                                                                                                       }
+                                                                                                       }
+                                                                                           },
+                                                                             "security":  [
+                                                                                              {
+                                                                                                  "bearerAuth":  [
+
+                                                                                                                 ]
+                                                                                              }
+                                                                                          ]
+                                                                         }
+                                                             },
+                  "/api/groups/{id}":  {
+                                           "get":  {
+                                                       "tags":  [
+                                                                    "Groups"
+                                                                ],
+                                                       "summary":  "Get specific group details by ID",
+                                                       "operationId":  "getGroupById",
+                                                       "parameters":  [
+                                                                          {
+                                                                              "name":  "id",
+                                                                              "in":  "path",
+                                                                              "required":  true,
+                                                                              "schema":  {
+                                                                                             "type":  "integer",
+                                                                                             "format":  "int64"
+                                                                                         }
+                                                                          }
+                                                                      ],
+                                                       "responses":  {
+                                                                         "200":  {
+                                                                                     "description":  "OK",
+                                                                                     "content":  {
+                                                                                                     "*/*":  {
+                                                                                                                 "schema":  {
+                                                                                                                                "$ref":  "#/components/schemas/GroupResponse"
+                                                                                                                            }
+                                                                                                             }
+                                                                                                 }
+                                                                                 }
+                                                                     },
+                                                       "security":  [
+                                                                        {
+                                                                            "bearerAuth":  [
+
+                                                                                           ]
+                                                                        }
+                                                                    ]
+                                                   },
+                                           "put":  {
+                                                       "tags":  [
+                                                                    "Groups"
+                                                                ],
+                                                       "summary":  "Update group name",
+                                                       "operationId":  "editGroup",
+                                                       "parameters":  [
+                                                                          {
+                                                                              "name":  "id",
+                                                                              "in":  "path",
+                                                                              "required":  true,
+                                                                              "schema":  {
+                                                                                             "type":  "integer",
+                                                                                             "format":  "int64"
+                                                                                         }
+                                                                          }
+                                                                      ],
+                                                       "requestBody":  {
+                                                                           "content":  {
+                                                                                           "application/json":  {
+                                                                                                                    "schema":  {
+                                                                                                                                   "$ref":  "#/components/schemas/GroupRequest"
+                                                                                                                               }
+                                                                                                                }
+                                                                                       },
+                                                                           "required":  true
+                                                                       },
+                                                       "responses":  {
+                                                                         "200":  {
+                                                                                     "description":  "OK",
+                                                                                     "content":  {
+                                                                                                     "*/*":  {
+                                                                                                                 "schema":  {
+                                                                                                                                "$ref":  "#/components/schemas/GroupResponse"
+                                                                                                                            }
+                                                                                                             }
+                                                                                                 }
+                                                                                 }
+                                                                     },
+                                                       "security":  [
+                                                                        {
+                                                                            "bearerAuth":  [
+
+                                                                                           ]
+                                                                        }
+                                                                    ]
+                                                   },
+                                           "delete":  {
+                                                          "tags":  [
+                                                                       "Groups"
+                                                                   ],
+                                                          "summary":  "Delete group",
+                                                          "operationId":  "deleteGroup",
+                                                          "parameters":  [
+                                                                             {
+                                                                                 "name":  "id",
+                                                                                 "in":  "path",
+                                                                                 "required":  true,
+                                                                                 "schema":  {
+                                                                                                "type":  "integer",
+                                                                                                "format":  "int64"
+                                                                                            }
+                                                                             }
+                                                                         ],
+                                                          "responses":  {
+                                                                            "200":  {
+                                                                                        "description":  "OK",
+                                                                                        "content":  {
+                                                                                                        "*/*":  {
+                                                                                                                    "schema":  {
+                                                                                                                                   "type":  "string"
+                                                                                                                               }
+                                                                                                                }
+                                                                                                    }
+                                                                                    }
+                                                                        },
+                                                          "security":  [
+                                                                           {
+                                                                               "bearerAuth":  [
+
+                                                                                              ]
+                                                                           }
+                                                                       ]
+                                                      }
+                                       },
+                  "/api/expenses/{id}":  {
+                                             "put":  {
+                                                         "tags":  [
+                                                                      "Expenses"
+                                                                  ],
+                                                         "summary":  "Edit an existing expense",
+                                                         "operationId":  "editExpense",
+                                                         "parameters":  [
+                                                                            {
+                                                                                "name":  "id",
+                                                                                "in":  "path",
+                                                                                "required":  true,
+                                                                                "schema":  {
+                                                                                               "type":  "integer",
+                                                                                               "format":  "int64"
+                                                                                           }
+                                                                            }
+                                                                        ],
+                                                         "requestBody":  {
+                                                                             "content":  {
+                                                                                             "application/json":  {
+                                                                                                                      "schema":  {
+                                                                                                                                     "$ref":  "#/components/schemas/ExpenseRequest"
+                                                                                                                                 }
+                                                                                                                  }
+                                                                                         },
+                                                                             "required":  true
+                                                                         },
+                                                         "responses":  {
+                                                                           "200":  {
+                                                                                       "description":  "OK",
+                                                                                       "content":  {
+                                                                                                       "*/*":  {
+                                                                                                                   "schema":  {
+                                                                                                                                  "$ref":  "#/components/schemas/ExpenseResponse"
+                                                                                                                              }
+                                                                                                               }
+                                                                                                   }
+                                                                                   }
+                                                                       },
+                                                         "security":  [
+                                                                          {
+                                                                              "bearerAuth":  [
+
+                                                                                             ]
+                                                                          }
+                                                                      ]
+                                                     },
+                                             "delete":  {
+                                                            "tags":  [
+                                                                         "Expenses"
+                                                                     ],
+                                                            "summary":  "Delete an expense",
+                                                            "operationId":  "deleteExpense",
+                                                            "parameters":  [
+                                                                               {
+                                                                                   "name":  "id",
+                                                                                   "in":  "path",
+                                                                                   "required":  true,
+                                                                                   "schema":  {
+                                                                                                  "type":  "integer",
+                                                                                                  "format":  "int64"
+                                                                                              }
+                                                                               }
+                                                                           ],
+                                                            "responses":  {
+                                                                              "200":  {
+                                                                                          "description":  "OK",
+                                                                                          "content":  {
+                                                                                                          "*/*":  {
+                                                                                                                      "schema":  {
+                                                                                                                                     "type":  "string"
+                                                                                                                                 }
+                                                                                                                  }
+                                                                                                      }
+                                                                                      }
+                                                                          },
+                                                            "security":  [
+                                                                             {
+                                                                                 "bearerAuth":  [
+
+                                                                                                ]
+                                                                             }
+                                                                         ]
+                                                        }
+                                         },
+                  "/api/users/me/change-password":  {
+                                                        "post":  {
+                                                                     "tags":  [
+                                                                                  "Users"
+                                                                              ],
+                                                                     "summary":  "Change current user password",
+                                                                     "operationId":  "changePassword",
+                                                                     "requestBody":  {
+                                                                                         "content":  {
+                                                                                                         "application/json":  {
+                                                                                                                                  "schema":  {
+                                                                                                                                                 "$ref":  "#/components/schemas/ChangePasswordRequest"
+                                                                                                                                             }
+                                                                                                                              }
+                                                                                                     },
+                                                                                         "required":  true
+                                                                                     },
+                                                                     "responses":  {
+                                                                                       "200":  {
+                                                                                                   "description":  "OK",
+                                                                                                   "content":  {
+                                                                                                                   "*/*":  {
+                                                                                                                               "schema":  {
+                                                                                                                                              "type":  "string"
+                                                                                                                                          }
+                                                                                                                           }
+                                                                                                               }
+                                                                                               }
+                                                                                   },
+                                                                     "security":  [
+                                                                                      {
+                                                                                          "bearerAuth":  [
+
+                                                                                                         ]
+                                                                                      }
+                                                                                  ]
+                                                                 }
+                                                    },
+                  "/api/settlements/group/{groupId}":  {
+                                                           "get":  {
+                                                                       "tags":  [
+                                                                                    "Settlements"
+                                                                                ],
+                                                                       "summary":  "List all recorded settlement transactions in a group",
+                                                                       "operationId":  "getGroupSettlements",
+                                                                       "parameters":  [
+                                                                                          {
+                                                                                              "name":  "groupId",
+                                                                                              "in":  "path",
+                                                                                              "required":  true,
+                                                                                              "schema":  {
+                                                                                                             "type":  "integer",
+                                                                                                             "format":  "int64"
+                                                                                                         }
+                                                                                          }
+                                                                                      ],
+                                                                       "responses":  {
+                                                                                         "200":  {
+                                                                                                     "description":  "OK",
+                                                                                                     "content":  {
+                                                                                                                     "*/*":  {
+                                                                                                                                 "schema":  {
+                                                                                                                                                "type":  "array",
+                                                                                                                                                "items":  {
+                                                                                                                                                              "$ref":  "#/components/schemas/SettlementResponse"
+                                                                                                                                                          }
+                                                                                                                                            }
+                                                                                                                             }
+                                                                                                                 }
+                                                                                                 }
+                                                                                     },
+                                                                       "security":  [
+                                                                                        {
+                                                                                            "bearerAuth":  [
+
+                                                                                                           ]
+                                                                                        }
+                                                                                    ]
+                                                                   },
+                                                           "post":  {
+                                                                        "tags":  [
+                                                                                     "Settlements"
+                                                                                 ],
+                                                                        "summary":  "Record a settlement payment between group members",
+                                                                        "operationId":  "createSettlement",
+                                                                        "parameters":  [
+                                                                                           {
+                                                                                               "name":  "groupId",
+                                                                                               "in":  "path",
+                                                                                               "required":  true,
+                                                                                               "schema":  {
+                                                                                                              "type":  "integer",
+                                                                                                              "format":  "int64"
+                                                                                                          }
+                                                                                           }
+                                                                                       ],
+                                                                        "requestBody":  {
+                                                                                            "content":  {
+                                                                                                            "application/json":  {
+                                                                                                                                     "schema":  {
+                                                                                                                                                    "$ref":  "#/components/schemas/SettlementRequest"
+                                                                                                                                                }
+                                                                                                                                 }
+                                                                                                        },
+                                                                                            "required":  true
+                                                                                        },
+                                                                        "responses":  {
+                                                                                          "200":  {
+                                                                                                      "description":  "OK",
+                                                                                                      "content":  {
+                                                                                                                      "*/*":  {
+                                                                                                                                  "schema":  {
+                                                                                                                                                 "$ref":  "#/components/schemas/SettlementResponse"
+                                                                                                                                             }
+                                                                                                                              }
+                                                                                                                  }
+                                                                                                  }
+                                                                                      },
+                                                                        "security":  [
+                                                                                         {
+                                                                                             "bearerAuth":  [
+
+                                                                                                            ]
+                                                                                         }
+                                                                                     ]
+                                                                    }
+                                                       },
+                  "/api/notifications/mark-read":  {
+                                                       "post":  {
+                                                                    "tags":  [
+                                                                                 "Notifications"
+                                                                             ],
+                                                                    "summary":  "Mark all notifications for the current user as read",
+                                                                    "operationId":  "markAllAsRead",
+                                                                    "responses":  {
+                                                                                      "200":  {
+                                                                                                  "description":  "OK",
+                                                                                                  "content":  {
+                                                                                                                  "*/*":  {
+                                                                                                                              "schema":  {
+                                                                                                                                             "type":  "string"
+                                                                                                                                         }
+                                                                                                                          }
+                                                                                                              }
+                                                                                              }
+                                                                                  },
+                                                                    "security":  [
+                                                                                     {
+                                                                                         "bearerAuth":  [
+
+                                                                                                        ]
+                                                                                     }
+                                                                                 ]
+                                                                }
+                                                   },
+                  "/api/groups":  {
+                                      "get":  {
+                                                  "tags":  [
+                                                               "Groups"
+                                                           ],
+                                                  "summary":  "List all groups associated with the current user",
+                                                  "operationId":  "getUserGroups",
+                                                  "responses":  {
+                                                                    "200":  {
+                                                                                "description":  "OK",
+                                                                                "content":  {
+                                                                                                "*/*":  {
+                                                                                                            "schema":  {
+                                                                                                                           "type":  "array",
+                                                                                                                           "items":  {
+                                                                                                                                         "$ref":  "#/components/schemas/GroupResponse"
+                                                                                                                                     }
+                                                                                                                       }
+                                                                                                        }
+                                                                                            }
+                                                                            }
+                                                                },
+                                                  "security":  [
+                                                                   {
+                                                                       "bearerAuth":  [
+
+                                                                                      ]
+                                                                   }
+                                                               ]
+                                              },
+                                      "post":  {
+                                                   "tags":  [
+                                                                "Groups"
+                                                            ],
+                                                   "summary":  "Create a new expense group",
+                                                   "operationId":  "createGroup",
+                                                   "requestBody":  {
+                                                                       "content":  {
+                                                                                       "application/json":  {
+                                                                                                                "schema":  {
+                                                                                                                               "$ref":  "#/components/schemas/GroupRequest"
+                                                                                                                           }
+                                                                                                            }
+                                                                                   },
+                                                                       "required":  true
+                                                                   },
+                                                   "responses":  {
+                                                                     "200":  {
+                                                                                 "description":  "OK",
+                                                                                 "content":  {
+                                                                                                 "*/*":  {
+                                                                                                             "schema":  {
+                                                                                                                            "$ref":  "#/components/schemas/GroupResponse"
+                                                                                                                        }
+                                                                                                         }
+                                                                                             }
+                                                                             }
+                                                                 },
+                                                   "security":  [
+                                                                    {
+                                                                        "bearerAuth":  [
+
+                                                                                       ]
+                                                                    }
+                                                                ]
+                                               }
+                                  },
+                  "/api/groups/{id}/members":  {
+                                                   "get":  {
+                                                               "tags":  [
+                                                                            "Groups"
+                                                                        ],
+                                                               "summary":  "Get all member users in a group",
+                                                               "operationId":  "getGroupMembers",
+                                                               "parameters":  [
+                                                                                  {
+                                                                                      "name":  "id",
+                                                                                      "in":  "path",
+                                                                                      "required":  true,
+                                                                                      "schema":  {
+                                                                                                     "type":  "integer",
+                                                                                                     "format":  "int64"
+                                                                                                 }
+                                                                                  }
+                                                                              ],
+                                                               "responses":  {
+                                                                                 "200":  {
+                                                                                             "description":  "OK",
+                                                                                             "content":  {
+                                                                                                             "*/*":  {
+                                                                                                                         "schema":  {
+                                                                                                                                        "type":  "array",
+                                                                                                                                        "items":  {
+                                                                                                                                                      "$ref":  "#/components/schemas/UserProfile"
+                                                                                                                                                  }
+                                                                                                                                    }
+                                                                                                                     }
+                                                                                                         }
+                                                                                         }
+                                                                             },
+                                                               "security":  [
+                                                                                {
+                                                                                    "bearerAuth":  [
+
+                                                                                                   ]
+                                                                                }
+                                                                            ]
+                                                           },
+                                                   "post":  {
+                                                                "tags":  [
+                                                                             "Groups"
+                                                                         ],
+                                                                "summary":  "Add a user member to a group by their registered email",
+                                                                "operationId":  "addMember",
+                                                                "parameters":  [
+                                                                                   {
+                                                                                       "name":  "id",
+                                                                                       "in":  "path",
+                                                                                       "required":  true,
+                                                                                       "schema":  {
+                                                                                                      "type":  "integer",
+                                                                                                      "format":  "int64"
+                                                                                                  }
+                                                                                   }
+                                                                               ],
+                                                                "requestBody":  {
+                                                                                    "content":  {
+                                                                                                    "application/json":  {
+                                                                                                                             "schema":  {
+                                                                                                                                            "$ref":  "#/components/schemas/AddMemberRequest"
+                                                                                                                                        }
+                                                                                                                         }
+                                                                                                },
+                                                                                    "required":  true
+                                                                                },
+                                                                "responses":  {
+                                                                                  "200":  {
+                                                                                              "description":  "OK",
+                                                                                              "content":  {
+                                                                                                              "*/*":  {
+                                                                                                                          "schema":  {
+                                                                                                                                         "type":  "string"
+                                                                                                                                     }
+                                                                                                                      }
+                                                                                                          }
+                                                                                          }
+                                                                              },
+                                                                "security":  [
+                                                                                 {
+                                                                                     "bearerAuth":  [
+
+                                                                                                    ]
+                                                                                 }
+                                                                             ]
+                                                            }
+                                               },
+                  "/api/expenses/group/{groupId}":  {
+                                                        "get":  {
+                                                                    "tags":  [
+                                                                                 "Expenses"
+                                                                             ],
+                                                                    "summary":  "Get paginated list of group expenses",
+                                                                    "operationId":  "getGroupExpenses",
+                                                                    "parameters":  [
+                                                                                       {
+                                                                                           "name":  "groupId",
+                                                                                           "in":  "path",
+                                                                                           "required":  true,
+                                                                                           "schema":  {
+                                                                                                          "type":  "integer",
+                                                                                                          "format":  "int64"
+                                                                                                      }
+                                                                                       },
+                                                                                       {
+                                                                                           "name":  "page",
+                                                                                           "in":  "query",
+                                                                                           "required":  false,
+                                                                                           "schema":  {
+                                                                                                          "type":  "integer",
+                                                                                                          "format":  "int32",
+                                                                                                          "default":  0
+                                                                                                      }
+                                                                                       },
+                                                                                       {
+                                                                                           "name":  "size",
+                                                                                           "in":  "query",
+                                                                                           "required":  false,
+                                                                                           "schema":  {
+                                                                                                          "type":  "integer",
+                                                                                                          "format":  "int32",
+                                                                                                          "default":  10
+                                                                                                      }
+                                                                                       },
+                                                                                       {
+                                                                                           "name":  "sort",
+                                                                                           "in":  "query",
+                                                                                           "required":  false,
+                                                                                           "schema":  {
+                                                                                                          "type":  "string",
+                                                                                                          "default":  "expenseDate,desc"
+                                                                                                      }
+                                                                                       }
+                                                                                   ],
+                                                                    "responses":  {
+                                                                                      "200":  {
+                                                                                                  "description":  "OK",
+                                                                                                  "content":  {
+                                                                                                                  "*/*":  {
+                                                                                                                              "schema":  {
+                                                                                                                                             "$ref":  "#/components/schemas/PageExpenseResponse"
+                                                                                                                                         }
+                                                                                                                          }
+                                                                                                              }
+                                                                                              }
+                                                                                  },
+                                                                    "security":  [
+                                                                                     {
+                                                                                         "bearerAuth":  [
+
+                                                                                                        ]
+                                                                                     }
+                                                                                 ]
+                                                                },
+                                                        "post":  {
+                                                                     "tags":  [
+                                                                                  "Expenses"
+                                                                              ],
+                                                                     "summary":  "Add a new expense to a group",
+                                                                     "operationId":  "addExpense",
+                                                                     "parameters":  [
+                                                                                        {
+                                                                                            "name":  "groupId",
+                                                                                            "in":  "path",
+                                                                                            "required":  true,
+                                                                                            "schema":  {
+                                                                                                           "type":  "integer",
+                                                                                                           "format":  "int64"
+                                                                                                       }
+                                                                                        }
+                                                                                    ],
+                                                                     "requestBody":  {
+                                                                                         "content":  {
+                                                                                                         "application/json":  {
+                                                                                                                                  "schema":  {
+                                                                                                                                                 "$ref":  "#/components/schemas/ExpenseRequest"
+                                                                                                                                             }
+                                                                                                                              }
+                                                                                                     },
+                                                                                         "required":  true
+                                                                                     },
+                                                                     "responses":  {
+                                                                                       "200":  {
+                                                                                                   "description":  "OK",
+                                                                                                   "content":  {
+                                                                                                                   "*/*":  {
+                                                                                                                               "schema":  {
+                                                                                                                                              "$ref":  "#/components/schemas/ExpenseResponse"
+                                                                                                                                          }
+                                                                                                                           }
+                                                                                                               }
+                                                                                               }
+                                                                                   },
+                                                                     "security":  [
+                                                                                      {
+                                                                                          "bearerAuth":  [
+
+                                                                                                         ]
+                                                                                      }
+                                                                                  ]
+                                                                 }
+                                                    },
+                  "/api/auth/register":  {
+                                             "post":  {
+                                                          "tags":  [
+                                                                       "Authentication"
+                                                                   ],
+                                                          "summary":  "Register a new user account",
+                                                          "operationId":  "registerUser",
+                                                          "requestBody":  {
+                                                                              "content":  {
+                                                                                              "application/json":  {
+                                                                                                                       "schema":  {
+                                                                                                                                      "$ref":  "#/components/schemas/RegisterRequest"
+                                                                                                                                  }
+                                                                                                                   }
+                                                                                          },
+                                                                              "required":  true
+                                                                          },
+                                                          "responses":  {
+                                                                            "200":  {
+                                                                                        "description":  "OK",
+                                                                                        "content":  {
+                                                                                                        "*/*":  {
+                                                                                                                    "schema":  {
+                                                                                                                                   "$ref":  "#/components/schemas/UserProfile"
+                                                                                                                               }
+                                                                                                                }
+                                                                                                    }
+                                                                                    }
+                                                                        }
+                                                      }
+                                         },
+                  "/api/auth/login":  {
+                                          "post":  {
+                                                       "tags":  [
+                                                                    "Authentication"
+                                                                ],
+                                                       "summary":  "Authenticate user and return JWT bearer token",
+                                                       "operationId":  "authenticateUser",
+                                                       "requestBody":  {
+                                                                           "content":  {
+                                                                                           "application/json":  {
+                                                                                                                    "schema":  {
+                                                                                                                                   "$ref":  "#/components/schemas/LoginRequest"
+                                                                                                                               }
+                                                                                                                }
+                                                                                       },
+                                                                           "required":  true
+                                                                       },
+                                                       "responses":  {
+                                                                         "200":  {
+                                                                                     "description":  "OK",
+                                                                                     "content":  {
+                                                                                                     "*/*":  {
+                                                                                                                 "schema":  {
+                                                                                                                                "$ref":  "#/components/schemas/AuthResponse"
+                                                                                                                            }
+                                                                                                             }
+                                                                                                 }
+                                                                                 }
+                                                                     }
+                                                   }
+                                      },
+                  "/api/settlements/group/{groupId}/owed":  {
+                                                                "get":  {
+                                                                            "tags":  [
+                                                                                         "Settlements"
+                                                                                     ],
+                                                                            "summary":  "Calculate simplified owed debts for members of a group (minimum transactions)",
+                                                                            "operationId":  "getOwedSettlements",
+                                                                            "parameters":  [
+                                                                                               {
+                                                                                                   "name":  "groupId",
+                                                                                                   "in":  "path",
+                                                                                                   "required":  true,
+                                                                                                   "schema":  {
+                                                                                                                  "type":  "integer",
+                                                                                                                  "format":  "int64"
+                                                                                                              }
+                                                                                               }
+                                                                                           ],
+                                                                            "responses":  {
+                                                                                              "200":  {
+                                                                                                          "description":  "OK",
+                                                                                                          "content":  {
+                                                                                                                          "*/*":  {
+                                                                                                                                      "schema":  {
+                                                                                                                                                     "type":  "array",
+                                                                                                                                                     "items":  {
+                                                                                                                                                                   "$ref":  "#/components/schemas/SettlementResponse"
+                                                                                                                                                               }
+                                                                                                                                                 }
+                                                                                                                                  }
+                                                                                                                      }
+                                                                                                      }
+                                                                                          },
+                                                                            "security":  [
+                                                                                             {
+                                                                                                 "bearerAuth":  [
+
+                                                                                                                ]
+                                                                                             }
+                                                                                         ]
+                                                                        }
+                                                            },
+                  "/api/notifications":  {
+                                             "get":  {
+                                                         "tags":  [
+                                                                      "Notifications"
+                                                                  ],
+                                                         "summary":  "Get paginated user notifications",
+                                                         "operationId":  "getUserNotifications",
+                                                         "parameters":  [
+                                                                            {
+                                                                                "name":  "page",
+                                                                                "in":  "query",
+                                                                                "required":  false,
+                                                                                "schema":  {
+                                                                                               "type":  "integer",
+                                                                                               "format":  "int32",
+                                                                                               "default":  0
+                                                                                           }
+                                                                            },
+                                                                            {
+                                                                                "name":  "size",
+                                                                                "in":  "query",
+                                                                                "required":  false,
+                                                                                "schema":  {
+                                                                                               "type":  "integer",
+                                                                                               "format":  "int32",
+                                                                                               "default":  20
+                                                                                           }
+                                                                            },
+                                                                            {
+                                                                                "name":  "sort",
+                                                                                "in":  "query",
+                                                                                "required":  false,
+                                                                                "schema":  {
+                                                                                               "type":  "string",
+                                                                                               "default":  "createdAt,desc"
+                                                                                           }
+                                                                            }
+                                                                        ],
+                                                         "responses":  {
+                                                                           "200":  {
+                                                                                       "description":  "OK",
+                                                                                       "content":  {
+                                                                                                       "*/*":  {
+                                                                                                                   "schema":  {
+                                                                                                                                  "$ref":  "#/components/schemas/PageNotificationDto"
+                                                                                                                              }
+                                                                                                               }
+                                                                                                   }
+                                                                                   }
+                                                                       },
+                                                         "security":  [
+                                                                          {
+                                                                              "bearerAuth":  [
+
+                                                                                             ]
+                                                                          }
+                                                                      ]
+                                                     }
+                                         },
+                  "/api/notifications/unread-count":  {
+                                                          "get":  {
+                                                                      "tags":  [
+                                                                                   "Notifications"
+                                                                               ],
+                                                                      "summary":  "Get count of unread notifications for current user",
+                                                                      "operationId":  "getUnreadCount",
+                                                                      "responses":  {
+                                                                                        "200":  {
+                                                                                                    "description":  "OK",
+                                                                                                    "content":  {
+                                                                                                                    "*/*":  {
+                                                                                                                                "schema":  {
+                                                                                                                                               "type":  "integer",
+                                                                                                                                               "format":  "int64"
+                                                                                                                                           }
+                                                                                                                            }
+                                                                                                                }
+                                                                                                }
+                                                                                    },
+                                                                      "security":  [
+                                                                                       {
+                                                                                           "bearerAuth":  [
+
+                                                                                                          ]
+                                                                                       }
+                                                                                   ]
+                                                                  }
+                                                      },
+                  "/api/history":  {
+                                       "get":  {
+                                                   "tags":  [
+                                                                "History"
+                                                            ],
+                                                   "summary":  "Get paginated user activity logs history",
+                                                   "operationId":  "getUserLogs",
+                                                   "parameters":  [
+                                                                      {
+                                                                          "name":  "page",
+                                                                          "in":  "query",
+                                                                          "required":  false,
+                                                                          "schema":  {
+                                                                                         "type":  "integer",
+                                                                                         "format":  "int32",
+                                                                                         "default":  0
+                                                                                     }
+                                                                      },
+                                                                      {
+                                                                          "name":  "size",
+                                                                          "in":  "query",
+                                                                          "required":  false,
+                                                                          "schema":  {
+                                                                                         "type":  "integer",
+                                                                                         "format":  "int32",
+                                                                                         "default":  20
+                                                                                     }
+                                                                      },
+                                                                      {
+                                                                          "name":  "sort",
+                                                                          "in":  "query",
+                                                                          "required":  false,
+                                                                          "schema":  {
+                                                                                         "type":  "string",
+                                                                                         "default":  "createdAt,desc"
+                                                                                     }
+                                                                      }
+                                                                  ],
+                                                   "responses":  {
+                                                                     "200":  {
+                                                                                 "description":  "OK",
+                                                                                 "content":  {
+                                                                                                 "*/*":  {
+                                                                                                             "schema":  {
+                                                                                                                            "$ref":  "#/components/schemas/PageActivityLogDto"
+                                                                                                                        }
+                                                                                                         }
+                                                                                             }
+                                                                             }
+                                                                 },
+                                                   "security":  [
+                                                                    {
+                                                                        "bearerAuth":  [
+
+                                                                                       ]
+                                                                    }
+                                                                ]
+                                               }
+                                   },
+                  "/api/dashboard":  {
+                                         "get":  {
+                                                     "tags":  [
+                                                                  "Dashboard"
+                                                              ],
+                                                     "summary":  "Get user summary statistics (total paid, owed, receive, group counts, recent logs)",
+                                                     "operationId":  "getDashboard",
+                                                     "responses":  {
+                                                                       "200":  {
+                                                                                   "description":  "OK",
+                                                                                   "content":  {
+                                                                                                   "*/*":  {
+                                                                                                               "schema":  {
+                                                                                                                              "$ref":  "#/components/schemas/DashboardResponse"
+                                                                                                                          }
+                                                                                                           }
+                                                                                               }
+                                                                               }
+                                                                   },
+                                                     "security":  [
+                                                                      {
+                                                                          "bearerAuth":  [
+
+                                                                                         ]
+                                                                      }
+                                                                  ]
+                                                 }
+                                     },
+                  "/api/groups/{id}/members/{userId}":  {
+                                                            "delete":  {
+                                                                           "tags":  [
+                                                                                        "Groups"
+                                                                                    ],
+                                                                           "summary":  "Remove a user member from a group",
+                                                                           "operationId":  "removeMember",
+                                                                           "parameters":  [
+                                                                                              {
+                                                                                                  "name":  "id",
+                                                                                                  "in":  "path",
+                                                                                                  "required":  true,
+                                                                                                  "schema":  {
+                                                                                                                 "type":  "integer",
+                                                                                                                 "format":  "int64"
+                                                                                                             }
+                                                                                              },
+                                                                                              {
+                                                                                                  "name":  "userId",
+                                                                                                  "in":  "path",
+                                                                                                  "required":  true,
+                                                                                                  "schema":  {
+                                                                                                                 "type":  "integer",
+                                                                                                                 "format":  "int64"
+                                                                                                             }
+                                                                                              }
+                                                                                          ],
+                                                                           "responses":  {
+                                                                                             "200":  {
+                                                                                                         "description":  "OK",
+                                                                                                         "content":  {
+                                                                                                                         "*/*":  {
+                                                                                                                                     "schema":  {
+                                                                                                                                                    "type":  "string"
+                                                                                                                                                }
+                                                                                                                                 }
+                                                                                                                     }
+                                                                                                     }
+                                                                                         },
+                                                                           "security":  [
+                                                                                            {
+                                                                                                "bearerAuth":  [
+
+                                                                                                               ]
+                                                                                            }
+                                                                                        ]
+                                                                       }
+                                                        }
+              },
+    "components":  {
+                       "schemas":  {
+                                       "UpdateProfileRequest":  {
+                                                                    "type":  "object",
+                                                                    "properties":  {
+                                                                                       "fullName":  {
+                                                                                                        "type":  "string",
+                                                                                                        "maxLength":  100,
+                                                                                                        "minLength":  0
+                                                                                                    }
+                                                                                   },
+                                                                    "required":  [
+                                                                                     "fullName"
+                                                                                 ]
+                                                                },
+                                       "UserProfile":  {
+                                                           "type":  "object",
+                                                           "properties":  {
+                                                                              "id":  {
+                                                                                         "type":  "integer",
+                                                                                         "format":  "int64"
+                                                                                     },
+                                                                              "fullName":  {
+                                                                                               "type":  "string"
+                                                                                           },
+                                                                              "email":  {
+                                                                                            "type":  "string"
+                                                                                        },
+                                                                              "createdAt":  {
+                                                                                                "type":  "string",
+                                                                                                "format":  "date-time"
+                                                                                            }
+                                                                          }
+                                                       },
+                                       "SettlementResponse":  {
+                                                                  "type":  "object",
+                                                                  "properties":  {
+                                                                                     "id":  {
+                                                                                                "type":  "integer",
+                                                                                                "format":  "int64"
+                                                                                            },
+                                                                                     "fromUserId":  {
+                                                                                                        "type":  "integer",
+                                                                                                        "format":  "int64"
+                                                                                                    },
+                                                                                     "fromUserName":  {
+                                                                                                          "type":  "string"
+                                                                                                      },
+                                                                                     "toUserId":  {
+                                                                                                      "type":  "integer",
+                                                                                                      "format":  "int64"
+                                                                                                  },
+                                                                                     "toUserName":  {
+                                                                                                        "type":  "string"
+                                                                                                    },
+                                                                                     "amount":  {
+                                                                                                    "type":  "number"
+                                                                                                },
+                                                                                     "status":  {
+                                                                                                    "type":  "string"
+                                                                                                },
+                                                                                     "createdAt":  {
+                                                                                                       "type":  "string",
+                                                                                                       "format":  "date-time"
+                                                                                                   }
+                                                                                 }
+                                                              },
+                                       "GroupRequest":  {
+                                                            "type":  "object",
+                                                            "properties":  {
+                                                                               "groupName":  {
+                                                                                                 "type":  "string",
+                                                                                                 "maxLength":  100,
+                                                                                                 "minLength":  0
+                                                                                             }
+                                                                           },
+                                                            "required":  [
+                                                                             "groupName"
+                                                                         ]
+                                                        },
+                                       "GroupResponse":  {
+                                                             "type":  "object",
+                                                             "properties":  {
+                                                                                "id":  {
+                                                                                           "type":  "integer",
+                                                                                           "format":  "int64"
+                                                                                       },
+                                                                                "groupName":  {
+                                                                                                  "type":  "string"
+                                                                                              },
+                                                                                "createdById":  {
+                                                                                                    "type":  "integer",
+                                                                                                    "format":  "int64"
+                                                                                                },
+                                                                                "createdByName":  {
+                                                                                                      "type":  "string"
+                                                                                                  },
+                                                                                "createdAt":  {
+                                                                                                  "type":  "string",
+                                                                                                  "format":  "date-time"
+                                                                                              }
+                                                                            }
+                                                         },
+                                       "ExpenseRequest":  {
+                                                              "type":  "object",
+                                                              "properties":  {
+                                                                                 "amount":  {
+                                                                                                "type":  "number",
+                                                                                                "minimum":  0.01
+                                                                                            },
+                                                                                 "description":  {
+                                                                                                     "type":  "string",
+                                                                                                     "maxLength":  255,
+                                                                                                     "minLength":  0
+                                                                                                 },
+                                                                                 "category":  {
+                                                                                                  "type":  "string",
+                                                                                                  "maxLength":  50,
+                                                                                                  "minLength":  0
+                                                                                              },
+                                                                                 "expenseDate":  {
+                                                                                                     "type":  "string",
+                                                                                                     "format":  "date"
+                                                                                                 },
+                                                                                 "paidById":  {
+                                                                                                  "type":  "integer",
+                                                                                                  "format":  "int64"
+                                                                                              },
+                                                                                 "participantShares":  {
+                                                                                                           "type":  "object",
+                                                                                                           "additionalProperties":  {
+                                                                                                                                        "type":  "number"
+                                                                                                                                    }
+                                                                                                       }
+                                                                             },
+                                                              "required":  [
+                                                                               "amount",
+                                                                               "category",
+                                                                               "description",
+                                                                               "expenseDate",
+                                                                               "paidById",
+                                                                               "participantShares"
+                                                                           ]
+                                                          },
+                                       "ExpenseResponse":  {
+                                                               "type":  "object",
+                                                               "properties":  {
+                                                                                  "id":  {
+                                                                                             "type":  "integer",
+                                                                                             "format":  "int64"
+                                                                                         },
+                                                                                  "amount":  {
+                                                                                                 "type":  "number"
+                                                                                             },
+                                                                                  "description":  {
+                                                                                                      "type":  "string"
+                                                                                                  },
+                                                                                  "category":  {
+                                                                                                   "type":  "string"
+                                                                                               },
+                                                                                  "expenseDate":  {
+                                                                                                      "type":  "string",
+                                                                                                      "format":  "date"
+                                                                                                  },
+                                                                                  "paidById":  {
+                                                                                                   "type":  "integer",
+                                                                                                   "format":  "int64"
+                                                                                               },
+                                                                                  "paidByName":  {
+                                                                                                     "type":  "string"
+                                                                                                 },
+                                                                                  "participants":  {
+                                                                                                       "type":  "array",
+                                                                                                       "items":  {
+                                                                                                                     "$ref":  "#/components/schemas/ParticipantShareDto"
+                                                                                                                 }
+                                                                                                   }
+                                                                              }
+                                                           },
+                                       "ParticipantShareDto":  {
+                                                                   "type":  "object",
+                                                                   "properties":  {
+                                                                                      "userId":  {
+                                                                                                     "type":  "integer",
+                                                                                                     "format":  "int64"
+                                                                                                 },
+                                                                                      "fullName":  {
+                                                                                                       "type":  "string"
+                                                                                                   },
+                                                                                      "email":  {
+                                                                                                    "type":  "string"
+                                                                                                },
+                                                                                      "shareAmount":  {
+                                                                                                          "type":  "number"
+                                                                                                      }
+                                                                                  }
+                                                               },
+                                       "ChangePasswordRequest":  {
+                                                                     "type":  "object",
+                                                                     "properties":  {
+                                                                                        "oldPassword":  {
+                                                                                                            "type":  "string"
+                                                                                                        },
+                                                                                        "newPassword":  {
+                                                                                                            "type":  "string",
+                                                                                                            "maxLength":  2147483647,
+                                                                                                            "minLength":  6
+                                                                                                        }
+                                                                                    },
+                                                                     "required":  [
+                                                                                      "newPassword",
+                                                                                      "oldPassword"
+                                                                                  ]
+                                                                 },
+                                       "SettlementRequest":  {
+                                                                 "type":  "object",
+                                                                 "properties":  {
+                                                                                    "fromUserId":  {
+                                                                                                       "type":  "integer",
+                                                                                                       "format":  "int64"
+                                                                                                   },
+                                                                                    "toUserId":  {
+                                                                                                     "type":  "integer",
+                                                                                                     "format":  "int64"
+                                                                                                 },
+                                                                                    "amount":  {
+                                                                                                   "type":  "number",
+                                                                                                   "minimum":  0.01
+                                                                                               },
+                                                                                    "status":  {
+                                                                                                   "type":  "string"
+                                                                                               }
+                                                                                },
+                                                                 "required":  [
+                                                                                  "amount",
+                                                                                  "fromUserId",
+                                                                                  "status",
+                                                                                  "toUserId"
+                                                                              ]
+                                                             },
+                                       "AddMemberRequest":  {
+                                                                "type":  "object",
+                                                                "properties":  {
+                                                                                   "email":  {
+                                                                                                 "type":  "string"
+                                                                                             }
+                                                                               },
+                                                                "required":  [
+                                                                                 "email"
+                                                                             ]
+                                                            },
+                                       "RegisterRequest":  {
+                                                               "type":  "object",
+                                                               "properties":  {
+                                                                                  "fullName":  {
+                                                                                                   "type":  "string",
+                                                                                                   "maxLength":  100,
+                                                                                                   "minLength":  0
+                                                                                               },
+                                                                                  "email":  {
+                                                                                                "type":  "string",
+                                                                                                "maxLength":  100,
+                                                                                                "minLength":  0
+                                                                                            },
+                                                                                  "password":  {
+                                                                                                   "type":  "string",
+                                                                                                   "maxLength":  2147483647,
+                                                                                                   "minLength":  6
+                                                                                               }
+                                                                              },
+                                                               "required":  [
+                                                                                "email",
+                                                                                "fullName",
+                                                                                "password"
+                                                                            ]
+                                                           },
+                                       "LoginRequest":  {
+                                                            "type":  "object",
+                                                            "properties":  {
+                                                                               "email":  {
+                                                                                             "type":  "string"
+                                                                                         },
+                                                                               "password":  {
+                                                                                                "type":  "string"
+                                                                                            }
+                                                                           },
+                                                            "required":  [
+                                                                             "email",
+                                                                             "password"
+                                                                         ]
+                                                        },
+                                       "AuthResponse":  {
+                                                            "type":  "object",
+                                                            "properties":  {
+                                                                               "token":  {
+                                                                                             "type":  "string"
+                                                                                         },
+                                                                               "tokenType":  {
+                                                                                                 "type":  "string"
+                                                                                             }
+                                                                           }
+                                                        },
+                                       "NotificationDto":  {
+                                                               "type":  "object",
+                                                               "properties":  {
+                                                                                  "id":  {
+                                                                                             "type":  "integer",
+                                                                                             "format":  "int64"
+                                                                                         },
+                                                                                  "message":  {
+                                                                                                  "type":  "string"
+                                                                                              },
+                                                                                  "type":  {
+                                                                                               "type":  "string"
+                                                                                           },
+                                                                                  "isRead":  {
+                                                                                                 "type":  "boolean"
+                                                                                             },
+                                                                                  "createdAt":  {
+                                                                                                    "type":  "string",
+                                                                                                    "format":  "date-time"
+                                                                                                }
+                                                                              }
+                                                           },
+                                       "PageNotificationDto":  {
+                                                                   "type":  "object",
+                                                                   "properties":  {
+                                                                                      "totalPages":  {
+                                                                                                         "type":  "integer",
+                                                                                                         "format":  "int32"
+                                                                                                     },
+                                                                                      "totalElements":  {
+                                                                                                            "type":  "integer",
+                                                                                                            "format":  "int64"
+                                                                                                        },
+                                                                                      "size":  {
+                                                                                                   "type":  "integer",
+                                                                                                   "format":  "int32"
+                                                                                               },
+                                                                                      "content":  {
+                                                                                                      "type":  "array",
+                                                                                                      "items":  {
+                                                                                                                    "$ref":  "#/components/schemas/NotificationDto"
+                                                                                                                }
+                                                                                                  },
+                                                                                      "number":  {
+                                                                                                     "type":  "integer",
+                                                                                                     "format":  "int32"
+                                                                                                 },
+                                                                                      "first":  {
+                                                                                                    "type":  "boolean"
+                                                                                                },
+                                                                                      "last":  {
+                                                                                                   "type":  "boolean"
+                                                                                               },
+                                                                                      "numberOfElements":  {
+                                                                                                               "type":  "integer",
+                                                                                                               "format":  "int32"
+                                                                                                           },
+                                                                                      "sort":  {
+                                                                                                   "$ref":  "#/components/schemas/SortObject"
+                                                                                               },
+                                                                                      "pageable":  {
+                                                                                                       "$ref":  "#/components/schemas/PageableObject"
+                                                                                                   },
+                                                                                      "empty":  {
+                                                                                                    "type":  "boolean"
+                                                                                                }
+                                                                                  }
+                                                               },
+                                       "PageableObject":  {
+                                                              "type":  "object",
+                                                              "properties":  {
+                                                                                 "offset":  {
+                                                                                                "type":  "integer",
+                                                                                                "format":  "int64"
+                                                                                            },
+                                                                                 "paged":  {
+                                                                                               "type":  "boolean"
+                                                                                           },
+                                                                                 "sort":  {
+                                                                                              "$ref":  "#/components/schemas/SortObject"
+                                                                                          },
+                                                                                 "unpaged":  {
+                                                                                                 "type":  "boolean"
+                                                                                             },
+                                                                                 "pageSize":  {
+                                                                                                  "type":  "integer",
+                                                                                                  "format":  "int32"
+                                                                                              },
+                                                                                 "pageNumber":  {
+                                                                                                    "type":  "integer",
+                                                                                                    "format":  "int32"
+                                                                                                }
+                                                                             }
+                                                          },
+                                       "SortObject":  {
+                                                          "type":  "object",
+                                                          "properties":  {
+                                                                             "empty":  {
+                                                                                           "type":  "boolean"
+                                                                                       },
+                                                                             "sorted":  {
+                                                                                            "type":  "boolean"
+                                                                                        },
+                                                                             "unsorted":  {
+                                                                                              "type":  "boolean"
+                                                                                          }
+                                                                         }
+                                                      },
+                                       "ActivityLogDto":  {
+                                                              "type":  "object",
+                                                              "properties":  {
+                                                                                 "id":  {
+                                                                                            "type":  "integer",
+                                                                                            "format":  "int64"
+                                                                                        },
+                                                                                 "userName":  {
+                                                                                                  "type":  "string"
+                                                                                              },
+                                                                                 "action":  {
+                                                                                                "type":  "string"
+                                                                                            },
+                                                                                 "createdAt":  {
+                                                                                                   "type":  "string",
+                                                                                                   "format":  "date-time"
+                                                                                               }
+                                                                             }
+                                                          },
+                                       "PageActivityLogDto":  {
+                                                                  "type":  "object",
+                                                                  "properties":  {
+                                                                                     "totalPages":  {
+                                                                                                        "type":  "integer",
+                                                                                                        "format":  "int32"
+                                                                                                    },
+                                                                                     "totalElements":  {
+                                                                                                           "type":  "integer",
+                                                                                                           "format":  "int64"
+                                                                                                       },
+                                                                                     "size":  {
+                                                                                                  "type":  "integer",
+                                                                                                  "format":  "int32"
+                                                                                              },
+                                                                                     "content":  {
+                                                                                                     "type":  "array",
+                                                                                                     "items":  {
+                                                                                                                   "$ref":  "#/components/schemas/ActivityLogDto"
+                                                                                                               }
+                                                                                                 },
+                                                                                     "number":  {
+                                                                                                    "type":  "integer",
+                                                                                                    "format":  "int32"
+                                                                                                },
+                                                                                     "first":  {
+                                                                                                   "type":  "boolean"
+                                                                                               },
+                                                                                     "last":  {
+                                                                                                  "type":  "boolean"
+                                                                                              },
+                                                                                     "numberOfElements":  {
+                                                                                                              "type":  "integer",
+                                                                                                              "format":  "int32"
+                                                                                                          },
+                                                                                     "sort":  {
+                                                                                                  "$ref":  "#/components/schemas/SortObject"
+                                                                                              },
+                                                                                     "pageable":  {
+                                                                                                      "$ref":  "#/components/schemas/PageableObject"
+                                                                                                  },
+                                                                                     "empty":  {
+                                                                                                   "type":  "boolean"
+                                                                                               }
+                                                                                 }
+                                                              },
+                                       "PageExpenseResponse":  {
+                                                                   "type":  "object",
+                                                                   "properties":  {
+                                                                                      "totalPages":  {
+                                                                                                         "type":  "integer",
+                                                                                                         "format":  "int32"
+                                                                                                     },
+                                                                                      "totalElements":  {
+                                                                                                            "type":  "integer",
+                                                                                                            "format":  "int64"
+                                                                                                        },
+                                                                                      "size":  {
+                                                                                                   "type":  "integer",
+                                                                                                   "format":  "int32"
+                                                                                               },
+                                                                                      "content":  {
+                                                                                                      "type":  "array",
+                                                                                                      "items":  {
+                                                                                                                    "$ref":  "#/components/schemas/ExpenseResponse"
+                                                                                                                }
+                                                                                                  },
+                                                                                      "number":  {
+                                                                                                     "type":  "integer",
+                                                                                                     "format":  "int32"
+                                                                                                 },
+                                                                                      "first":  {
+                                                                                                    "type":  "boolean"
+                                                                                                },
+                                                                                      "last":  {
+                                                                                                   "type":  "boolean"
+                                                                                               },
+                                                                                      "numberOfElements":  {
+                                                                                                               "type":  "integer",
+                                                                                                               "format":  "int32"
+                                                                                                           },
+                                                                                      "sort":  {
+                                                                                                   "$ref":  "#/components/schemas/SortObject"
+                                                                                               },
+                                                                                      "pageable":  {
+                                                                                                       "$ref":  "#/components/schemas/PageableObject"
+                                                                                                   },
+                                                                                      "empty":  {
+                                                                                                    "type":  "boolean"
+                                                                                                }
+                                                                                  }
+                                                               },
+                                       "DashboardResponse":  {
+                                                                 "type":  "object",
+                                                                 "properties":  {
+                                                                                    "totalPaid":  {
+                                                                                                      "type":  "number"
+                                                                                                  },
+                                                                                    "totalOwed":  {
+                                                                                                      "type":  "number"
+                                                                                                  },
+                                                                                    "amountToReceive":  {
+                                                                                                            "type":  "number"
+                                                                                                        },
+                                                                                    "totalGroups":  {
+                                                                                                        "type":  "integer",
+                                                                                                        "format":  "int32"
+                                                                                                    },
+                                                                                    "recentActivities":  {
+                                                                                                             "type":  "array",
+                                                                                                             "items":  {
+                                                                                                                           "$ref":  "#/components/schemas/ActivityLogDto"
+                                                                                                                       }
+                                                                                                         }
+                                                                                }
+                                                             }
+                                   },
+                       "securitySchemes":  {
+                                               "bearerAuth":  {
+                                                                  "type":  "http",
+                                                                  "name":  "bearerAuth",
+                                                                  "scheme":  "bearer",
+                                                                  "bearerFormat":  "JWT"
+                                                              }
+                                           }
+                   }
+}

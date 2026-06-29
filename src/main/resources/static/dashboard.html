@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - SplitWiseMoney</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+<body>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom fixed-top">
+        <div class="container">
+            <a class="navbar-brand navbar-brand-custom" href="dashboard.html">
+                <i class="fa-solid fa-wallet me-2"></i>SplitWiseMoney
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="dashboard.html"><i class="fa-solid fa-chart-line me-1"></i>Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="groups.html"><i class="fa-solid fa-users me-1"></i>Groups</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="history.html"><i class="fa-solid fa-history me-1"></i>Activity Log</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto align-items-lg-center">
+                    <li class="nav-item me-3 position-relative">
+                        <a class="nav-link" href="notifications.html">
+                            <i class="fa-solid fa-bell fs-5"></i>
+                            <span id="unreadNotificationBadge" class="badge-notify-count d-none">0</span>
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fa-solid fa-circle-user fs-4 me-2"></i><span id="headerUserName">Profile</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary">
+                            <li><a class="dropdown-item text-light" href="profile.html"><i class="fa-solid fa-user me-2"></i>My Profile</a></li>
+                            <li><a class="dropdown-item text-light" href="settings.html"><i class="fa-solid fa-gear me-2"></i>Settings</a></li>
+                            <li><hr class="dropdown-divider border-secondary"></li>
+                            <li><a class="dropdown-item text-light" href="#" id="logoutLink"><i class="fa-solid fa-right-from-bracket me-2"></i>Sign Out</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container" style="padding-top: 100px; padding-bottom: 50px;">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2 class="fw-bold">Welcome back, <span id="welcomeUserName" class="text-white">User</span>!</h2>
+                <p class="text-secondary">Here is your expense sharing summary.</p>
+            </div>
+        </div>
+
+        <!-- Metric Grid -->
+        <div class="row g-4 mb-5">
+            <div class="col-sm-6 col-lg-3">
+                <div class="glass-card p-4 card-metric">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="text-secondary fw-semibold">Total Paid</span>
+                        <i class="fa-solid fa-wallet text-indigo fs-4"></i>
+                    </div>
+                    <h3 class="fw-bold mb-0 text-white" id="statTotalPaid">₹0.00</h3>
+                    <p class="text-secondary mb-0 mt-2 small">Across all groups</p>
+                </div>
+            </div>
+            
+            <div class="col-sm-6 col-lg-3">
+                <div class="glass-card p-4 card-metric debit">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="text-secondary fw-semibold">You Owe</span>
+                        <i class="fa-solid fa-arrow-down-left text-danger fs-4"></i>
+                    </div>
+                    <h3 class="fw-bold mb-0 text-white" id="statTotalOwed">₹0.00</h3>
+                    <p class="text-secondary mb-0 mt-2 small">Need to settle</p>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-lg-3">
+                <div class="glass-card p-4 card-metric credit">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="text-secondary fw-semibold">You Are Owed</span>
+                        <i class="fa-solid fa-arrow-up-right text-success fs-4"></i>
+                    </div>
+                    <h3 class="fw-bold mb-0 text-white" id="statTotalReceive">₹0.00</h3>
+                    <p class="text-secondary mb-0 mt-2 small">To receive back</p>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-lg-3">
+                <div class="glass-card p-4 card-metric groups">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="text-secondary fw-semibold">Total Groups</span>
+                        <i class="fa-solid fa-users text-cyan fs-4"></i>
+                    </div>
+                    <h3 class="fw-bold mb-0 text-white" id="statTotalGroups">0</h3>
+                    <p class="text-secondary mb-0 mt-2 small">Active memberships</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Recent Activities -->
+            <div class="col-lg-7">
+                <div class="glass-card p-4 h-100">
+                    <h4 class="fw-bold mb-4"><i class="fa-solid fa-history me-2 text-indigo"></i>Recent Activities</h4>
+                    <div id="recentActivityList">
+                        <!-- Activity items loaded dynamically -->
+                        <div class="text-center py-5 text-secondary">
+                            <i class="fa-solid fa-circle-notch fa-spin fs-2 mb-3"></i>
+                            <p>Loading activities...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Access Groups -->
+            <div class="col-lg-5">
+                <div class="glass-card p-4 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4 class="fw-bold mb-0"><i class="fa-solid fa-users me-2 text-indigo"></i>Quick Groups</h4>
+                        <a href="groups.html" class="btn btn-secondary-outline btn-sm">View All</a>
+                    </div>
+                    <div id="quickGroupList">
+                        <!-- Groups loaded dynamically -->
+                        <div class="text-center py-5 text-secondary">
+                            <i class="fa-solid fa-circle-notch fa-spin fs-2 mb-3"></i>
+                            <p>Loading groups...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Frontend API Connection -->
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize Dashboard page
+            App.initDashboard();
+        });
+    </script>
+</body>
+</html>

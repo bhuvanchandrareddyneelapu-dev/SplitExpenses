@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Expense - SplitWiseMoney</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+<body>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom fixed-top">
+        <div class="container">
+            <a class="navbar-brand navbar-brand-custom" href="dashboard.html">
+                <i class="fa-solid fa-wallet me-2"></i>SplitWiseMoney
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="dashboard.html"><i class="fa-solid fa-chart-line me-1"></i>Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="groups.html"><i class="fa-solid fa-users me-1"></i>Groups</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="history.html"><i class="fa-solid fa-history me-1"></i>Activity Log</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto align-items-lg-center">
+                    <li class="nav-item me-3 position-relative">
+                        <a class="nav-link" href="notifications.html">
+                            <i class="fa-solid fa-bell fs-5"></i>
+                            <span id="unreadNotificationBadge" class="badge-notify-count d-none">0</span>
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fa-solid fa-circle-user fs-4 me-2"></i><span id="headerUserName">Profile</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary">
+                            <li><a class="dropdown-item text-light" href="profile.html"><i class="fa-solid fa-user me-2"></i>My Profile</a></li>
+                            <li><a class="dropdown-item text-light" href="settings.html"><i class="fa-solid fa-gear me-2"></i>Settings</a></li>
+                            <li><hr class="dropdown-divider border-secondary"></li>
+                            <li><a class="dropdown-item text-light" href="#" id="logoutLink"><i class="fa-solid fa-right-from-bracket me-2"></i>Sign Out</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container" style="padding-top: 100px; padding-bottom: 50px;">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <a href="#" id="btnBackToGroup" class="text-secondary text-decoration-none mb-3 d-inline-block"><i class="fa-solid fa-arrow-left me-2"></i>Back to Group</a>
+                
+                <div class="glass-card p-5">
+                    <h3 class="fw-bold mb-4" id="expenseFormTitle">Add Expense</h3>
+                    
+                    <div id="expenseAlertArea" class="d-none alert alert-danger border-0 text-white" style="background: var(--accent-rose);"></div>
+
+                    <form id="expenseForm">
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label for="amount" class="form-label text-secondary">Amount (₹)</label>
+                                <input type="number" step="0.01" class="form-control form-glass" id="amount" placeholder="0.00" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="description" class="form-label text-secondary">Description</label>
+                                <input type="text" class="form-control form-glass" id="description" placeholder="e.g. Flight tickets, Groceries, Cab" required>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label for="category" class="form-label text-secondary">Category</label>
+                                <select class="form-select form-glass" id="category" required>
+                                    <option value="Food">Food</option>
+                                    <option value="Travel" selected>Travel</option>
+                                    <option value="Fuel">Fuel</option>
+                                    <option value="Hotel">Hotel</option>
+                                    <option value="Shopping">Shopping</option>
+                                    <option value="Groceries">Groceries</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="expenseDate" class="form-label text-secondary">Date</label>
+                                <input type="date" class="form-control form-glass" id="expenseDate" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="paidBy" class="form-label text-secondary">Paid By</label>
+                                <select class="form-select form-glass" id="paidBy" required>
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+                        </div>
+
+                        <hr class="border-secondary my-4">
+
+                        <!-- Split Logic Selection -->
+                        <div class="mb-4">
+                            <label class="form-label text-secondary d-block">Split Method</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="splitMethod" id="splitEqual" value="EQUAL" checked>
+                                <label class="btn btn-secondary-outline border-end-0 rounded-start" for="splitEqual">Split Equally</label>
+
+                                <input type="radio" class="btn-check" name="splitMethod" id="splitPercent" value="PERCENT">
+                                <label class="btn btn-secondary-outline border-start-0 border-end-0 rounded-0" for="splitPercent">Percentage Split</label>
+
+                                <input type="radio" class="btn-check" name="splitMethod" id="splitCustom" value="CUSTOM">
+                                <label class="btn btn-secondary-outline border-start-0 rounded-end" for="splitCustom">Custom Split</label>
+                            </div>
+                        </div>
+
+                        <!-- Participants List & Shares -->
+                        <div class="mb-5">
+                            <h5 class="fw-bold mb-3 text-secondary">Split Between:</h5>
+                            <div class="table-responsive">
+                                <table class="table table-custom align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 50px;">Select</th>
+                                            <th>Name</th>
+                                            <th id="shareColumnHeader" style="width: 200px;">Share</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="participantsSplitTableBody">
+                                        <!-- Populated dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="text-end text-secondary small mt-2 d-none" id="splitSummaryText">
+                                Sum of shares: ₹0.00 / ₹0.00
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-3">
+                            <button type="submit" class="btn btn-primary-glow px-5" id="btnSubmitExpense">Add Expense</button>
+                            <a href="#" class="btn btn-secondary-outline px-5" id="btnCancelExpense">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Frontend API Connection -->
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            App.initAddExpense();
+        });
+    </script>
+</body>
+</html>

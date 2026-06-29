@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SplitWiseMoney - Easy Expense Sharing & Settlement</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+<body>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom fixed-top">
+        <div class="container">
+            <a class="navbar-brand navbar-brand-custom" href="index.html">
+                <i class="fa-solid fa-wallet me-2"></i>SplitWiseMoney
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-collapse justify-content-end navbar-nav">
+                    <li class="nav-item me-2">
+                        <a class="nav-link" href="login.html">Login</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="btn btn-primary-glow" href="register.html">Get Started</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="landing-hero d-flex align-items-center">
+        <div class="container text-center text-lg-start my-5">
+            <div class="row align-items-center py-5">
+                <div class="col-lg-6 mb-5 mb-lg-0">
+                    <h1 class="display-3 fw-bold mb-4" style="background: linear-gradient(135deg, #ffffff 0%, var(--text-secondary) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                        Share Expenses.<br>Settle Smarter.
+                    </h1>
+                    <p class="lead text-secondary mb-5">
+                        SplitWiseMoney makes splitting bills, travel costs, rents, and group outings effortless. Our distributed debt simplification algorithm calculates the minimum possible transactions to settle up.
+                    </p>
+                    <div class="d-flex flex-column flex-sm-row gap-3">
+                        <a href="register.html" class="btn btn-primary-glow btn-lg px-5 py-3">
+                            <i class="fa-solid fa-user-plus me-2"></i>Create Free Account
+                        </a>
+                        <a href="login.html" class="btn btn-secondary-outline btn-lg px-5 py-3">
+                            <i class="fa-solid fa-sign-in me-2"></i>Sign In
+                        </a>
+                    </div>
+                </div>
+                <div class="col-lg-6 text-center">
+                    <div class="glass-card p-5 mx-auto" style="max-width: 500px;">
+                        <div class="text-center mb-4">
+                            <span class="badge bg-secondary badge-category badge-travel mb-2">Equal Split Example</span>
+                            <h4 class="fw-bold">Goa Trip Summary</h4>
+                        </div>
+                        <div class="d-flex justify-content-between border-bottom border-secondary pb-3 mb-3 text-start">
+                            <div>
+                                <h6 class="text-secondary mb-0">Rahul paid</h6>
+                                <p class="mb-0 fw-medium">Cab Expense</p>
+                            </div>
+                            <span class="fs-5 fw-bold text-light">₹1,200.00</span>
+                        </div>
+                        <div class="d-flex justify-content-between border-bottom border-secondary pb-3 mb-3 text-start">
+                            <div>
+                                <h6 class="text-secondary mb-0">Priya paid</h6>
+                                <p class="mb-0 fw-medium">Dinner Expense</p>
+                            </div>
+                            <span class="fs-5 fw-bold text-light">₹800.00</span>
+                        </div>
+                        <div class="d-flex justify-content-between border-bottom border-secondary pb-3 mb-3 text-start">
+                            <div>
+                                <h6 class="text-secondary mb-0">Kiran paid</h6>
+                                <p class="mb-0 fw-medium">Shared snacks</p>
+                            </div>
+                            <span class="fs-5 fw-bold text-light">₹0.00</span>
+                        </div>
+                        <div class="glass-panel p-3 text-start mt-4 border border-secondary">
+                            <h6 class="text-secondary fw-semibold mb-2">Simplified Settlements:</h6>
+                            <p class="mb-1 text-light"><i class="fa-solid fa-arrow-right text-success me-2"></i>Kiran pays Rahul <strong class="text-success">₹533.33</strong></p>
+                            <p class="mb-0 text-light"><i class="fa-solid fa-arrow-right text-success me-2"></i>Kiran pays Priya <strong class="text-success">₹133.33</strong></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="py-5" style="background: rgba(255, 255, 255, 0.01); border-top: 1px solid var(--border-color);">
+        <div class="container py-5">
+            <h2 class="text-center fw-bold mb-5">Features built for FinTech simplicity</h2>
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="glass-card p-4 h-100">
+                        <div class="feature-icon-box">
+                            <i class="fa-solid fa-calculator"></i>
+                        </div>
+                        <h4 class="fw-bold">Flexible Splits</h4>
+                        <p class="text-secondary">Split expenses equally, by custom percentage shares, or exact custom amounts for ultimate control.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="glass-card p-4 h-100">
+                        <div class="feature-icon-box">
+                            <i class="fa-solid fa-share-nodes"></i>
+                        </div>
+                        <h4 class="fw-bold">Debt Simplification</h4>
+                        <p class="text-secondary">Minimize total number of transactions needed to settle multiple balances within any group automatically.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="glass-card p-4 h-100">
+                        <div class="feature-icon-box">
+                            <i class="fa-solid fa-bell"></i>
+                        </div>
+                        <h4 class="fw-bold">Instant Notifications</h4>
+                        <p class="text-secondary">Stay updated with instant email and system alerts when expenses are added or settlement payments are made.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-4 text-center text-secondary border-top border-secondary mt-5" style="font-size: 0.9rem;">
+        <div class="container">
+            <p class="mb-0">&copy; 2026 SplitWiseMoney. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Group Details - SplitWiseMoney</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+<body>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom fixed-top">
+        <div class="container">
+            <a class="navbar-brand navbar-brand-custom" href="dashboard.html">
+                <i class="fa-solid fa-wallet me-2"></i>SplitWiseMoney
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="dashboard.html"><i class="fa-solid fa-chart-line me-1"></i>Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="groups.html"><i class="fa-solid fa-users me-1"></i>Groups</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="history.html"><i class="fa-solid fa-history me-1"></i>Activity Log</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto align-items-lg-center">
+                    <li class="nav-item me-3 position-relative">
+                        <a class="nav-link" href="notifications.html">
+                            <i class="fa-solid fa-bell fs-5"></i>
+                            <span id="unreadNotificationBadge" class="badge-notify-count d-none">0</span>
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fa-solid fa-circle-user fs-4 me-2"></i><span id="headerUserName">Profile</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary">
+                            <li><a class="dropdown-item text-light" href="profile.html"><i class="fa-solid fa-user me-2"></i>My Profile</a></li>
+                            <li><a class="dropdown-item text-light" href="settings.html"><i class="fa-solid fa-gear me-2"></i>Settings</a></li>
+                            <li><hr class="dropdown-divider border-secondary"></li>
+                            <li><a class="dropdown-item text-light" href="#" id="logoutLink"><i class="fa-solid fa-right-from-bracket me-2"></i>Sign Out</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container" style="padding-top: 100px; padding-bottom: 50px;">
+        <!-- Alert Box -->
+        <div id="groupAlertArea" class="d-none alert alert-info border-0 text-white" style="background: var(--accent-indigo); opacity: 0.9;"></div>
+
+        <!-- Header -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-5 gap-3">
+            <div>
+                <a href="groups.html" class="text-secondary text-decoration-none mb-2 d-inline-block"><i class="fa-solid fa-arrow-left me-2"></i>Back to Groups</a>
+                <h2 class="fw-bold mb-0" id="groupDetailName">Loading Group...</h2>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-secondary-outline" id="btnEditGroup" data-bs-toggle="modal" data-bs-target="#editGroupModal">
+                    <i class="fa-solid fa-edit me-1"></i>Rename
+                </button>
+                <button class="btn btn-secondary-outline text-danger border-danger" id="btnDeleteGroup">
+                    <i class="fa-solid fa-trash me-1"></i>Delete Group
+                </button>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Left Column: Expenses -->
+            <div class="col-lg-8">
+                <div class="glass-card p-4 mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4 class="fw-bold mb-0"><i class="fa-solid fa-receipt me-2 text-indigo"></i>Expenses</h4>
+                        <a href="#" id="btnAddExpenseLink" class="btn btn-primary-glow">
+                            <i class="fa-solid fa-plus me-2"></i>Add Expense
+                        </a>
+                    </div>
+
+                    <!-- Expenses List -->
+                    <div id="expenseList">
+                        <div class="text-center py-4 text-secondary">
+                            <i class="fa-solid fa-circle-notch fa-spin fs-3 mb-2"></i>
+                            <p>Loading expenses...</p>
+                        </div>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div class="d-flex justify-content-between align-items-center mt-4">
+                        <button class="btn btn-secondary-outline btn-sm" id="btnPrevPage" disabled>
+                            <i class="fa-solid fa-chevron-left me-1"></i>Previous
+                        </button>
+                        <span class="text-secondary small" id="expensePaginationText">Page 1 of 1</span>
+                        <button class="btn btn-secondary-outline btn-sm" id="btnNextPage" disabled>
+                            Next<i class="fa-solid fa-chevron-right ms-1"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Settlements History -->
+                <div class="glass-card p-4">
+                    <h4 class="fw-bold mb-4"><i class="fa-solid fa-money-bill-transfer me-2 text-indigo"></i>Recorded Settlements</h4>
+                    <div id="settlementHistoryList">
+                        <p class="text-secondary mb-0">No recorded settlements yet.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Members & Settlements Calculation -->
+            <div class="col-lg-4">
+                <!-- Group Members -->
+                <div class="glass-card p-4 mb-4">
+                    <h4 class="fw-bold mb-3"><i class="fa-solid fa-users me-2 text-indigo"></i>Members</h4>
+                    <div id="memberList" class="mb-4">
+                        <!-- Member items loaded dynamically -->
+                    </div>
+                    
+                    <form id="addMemberForm">
+                        <h6 class="text-secondary mb-2">Add Member by Email</h6>
+                        <div class="input-group">
+                            <input type="email" class="form-control form-glass" id="newMemberEmail" placeholder="friend@example.com" required>
+                            <button class="btn btn-primary-glow px-3" type="submit"><i class="fa-solid fa-user-plus"></i></button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Debt Simplification Settlement Console -->
+                <div class="glass-card p-4">
+                    <h4 class="fw-bold mb-3"><i class="fa-solid fa-handshake me-2 text-indigo"></i>Simplified Debts</h4>
+                    <p class="text-secondary small mb-3">Calculated minimum transactions to settle up balances:</p>
+                    <div id="simplifiedSettlementConsole">
+                        <!-- Settlement calculations loaded dynamically -->
+                        <div class="text-center py-3 text-secondary">
+                            <i class="fa-solid fa-circle-notch fa-spin fs-4 mb-2"></i>
+                            <p>Calculating settlements...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Group Modal -->
+    <div class="modal fade" id="editGroupModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modal-content-glass">
+                <div class="modal-header modal-header-custom">
+                    <h5 class="modal-title fw-bold">Rename Group</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="editGroupForm">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="editGroupName" class="form-label text-secondary">New Group Name</label>
+                            <input type="text" class="form-control form-glass" id="editGroupName" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer modal-footer-custom">
+                        <button type="button" class="btn btn-secondary-outline" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary-glow">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Frontend API Connection -->
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            App.initGroupDetails();
+        });
+    </script>
+</body>
+</html>

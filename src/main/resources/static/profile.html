@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile - SplitWiseMoney</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+<body>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom fixed-top">
+        <div class="container">
+            <a class="navbar-brand navbar-brand-custom" href="dashboard.html">
+                <i class="fa-solid fa-wallet me-2"></i>SplitWiseMoney
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="dashboard.html"><i class="fa-solid fa-chart-line me-1"></i>Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="groups.html"><i class="fa-solid fa-users me-1"></i>Groups</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="history.html"><i class="fa-solid fa-history me-1"></i>Activity Log</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto align-items-lg-center">
+                    <li class="nav-item me-3 position-relative">
+                        <a class="nav-link" href="notifications.html">
+                            <i class="fa-solid fa-bell fs-5"></i>
+                            <span id="unreadNotificationBadge" class="badge-notify-count d-none">0</span>
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fa-solid fa-circle-user fs-4 me-2"></i><span id="headerUserName">Profile</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end bg-dark border-secondary">
+                            <li><a class="dropdown-item text-light active" href="profile.html"><i class="fa-solid fa-user me-2"></i>My Profile</a></li>
+                            <li><a class="dropdown-item text-light" href="settings.html"><i class="fa-solid fa-gear me-2"></i>Settings</a></li>
+                            <li><hr class="dropdown-divider border-secondary"></li>
+                            <li><a class="dropdown-item text-light" href="#" id="logoutLink"><i class="fa-solid fa-right-from-bracket me-2"></i>Sign Out</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container" style="padding-top: 100px; padding-bottom: 50px;">
+        <div class="row justify-content-center">
+            <div class="col-lg-6">
+                <h2 class="fw-bold mb-4">My Profile</h2>
+                
+                <div class="glass-card p-5">
+                    <div id="profileAlertArea" class="d-none alert border-0 text-white" style="opacity: 0.9;"></div>
+
+                    <div class="text-center mb-5">
+                        <i class="fa-solid fa-circle-user text-indigo" style="font-size: 5.5rem; filter: drop-shadow(0 0 10px var(--glow-indigo));"></i>
+                        <h4 class="fw-bold mt-3 mb-1" id="profileDisplayName">User Name</h4>
+                        <p class="text-secondary" id="profileDisplayEmail">user@example.com</p>
+                    </div>
+
+                    <form id="profileForm">
+                        <div class="mb-4">
+                            <label for="profileFullName" class="form-label text-secondary">Full Name</label>
+                            <input type="text" class="form-control form-glass" id="profileFullName" required>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label text-secondary">Email Address</label>
+                            <input type="email" class="form-control form-glass" id="profileEmailReadOnly" disabled>
+                            <div class="form-text text-secondary small">Email address cannot be changed.</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label text-secondary">Account Created</label>
+                            <input type="text" class="form-control form-glass" id="profileCreatedAt" disabled>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary-glow w-100 py-3 mt-2">
+                            <i class="fa-solid fa-save me-2"></i>Save Changes
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Frontend API Connection -->
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            App.initProfile();
+        });
+    </script>
+</body>
+</html>
