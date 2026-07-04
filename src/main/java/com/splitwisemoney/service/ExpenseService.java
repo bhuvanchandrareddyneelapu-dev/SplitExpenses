@@ -22,6 +22,7 @@ public class ExpenseService {
     private final GroupRepository groupRepository;
     private final UserRepository userRepository;
     private final GroupMemberRepository groupMemberRepository;
+    private final ExpenseApprovalRepository expenseApprovalRepository;
     private final ActivityLogService activityLogService;
     private final NotificationService notificationService;
 
@@ -30,6 +31,7 @@ public class ExpenseService {
                           GroupRepository groupRepository,
                           UserRepository userRepository,
                           GroupMemberRepository groupMemberRepository,
+                          ExpenseApprovalRepository expenseApprovalRepository,
                           ActivityLogService activityLogService,
                           NotificationService notificationService) {
         this.expenseRepository = expenseRepository;
@@ -37,6 +39,7 @@ public class ExpenseService {
         this.groupRepository = groupRepository;
         this.userRepository = userRepository;
         this.groupMemberRepository = groupMemberRepository;
+        this.expenseApprovalRepository = expenseApprovalRepository;
         this.activityLogService = activityLogService;
         this.notificationService = notificationService;
     }
@@ -45,6 +48,10 @@ public class ExpenseService {
     public Expense addExpense(Long groupId, Long paidById, BigDecimal amount, String description,
                              String category, LocalDate expenseDate, Map<Long, BigDecimal> participantShares, User actor) {
         
+        if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, actor.getId())) {
+            throw new IllegalArgumentException("Only group members can add expenses.");
+        }
+
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found"));
 
@@ -90,6 +97,31 @@ public class ExpenseService {
         }
         expenseParticipantRepository.saveAll(participants);
 
+        List<ExpenseApproval> approvals = new ArrayList<>();
+        for (Map.Entry<Long, BigDecimal> entry : participantShares.entrySet()) {
+            Long userId = entry.getKey();
+            User participantUser = userRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("Participant user " + userId + " not found"));
+
+            ExpenseApproval approval = new ExpenseApproval(savedExpense, participantUser);
+            if (userId.equals(paidById)) {
+                approval.setStatus("APPROVED");
+                approval.setApprovedAt(java.time.LocalDateTime.now());
+            } else {
+                approval.setStatus("PENDING");
+                notificationService.createNotification(participantUser, "EXPENSE_APPROVAL",
+                        paidBy.getFullName() + " added an expense \"" + description + "\" of ₹" + amount + ". Please approve.");
+            }
+            approvals.add(approval);
+        }
+        expenseApprovalRepository.saveAll(approvals);
+
+        boolean allApproved = approvals.stream().allMatch(a -> "APPROVED".equalsIgnoreCase(a.getStatus()));
+        if (allApproved) {
+            savedExpense.setVerificationStatus("VERIFIED");
+            expenseRepository.save(savedExpense);
+        }
+
         activityLogService.log(actor, "Added expense \"" + description + "\" of ₹" + amount + " to group " + group.getGroupName());
         
         return savedExpense;
@@ -103,6 +135,10 @@ public class ExpenseService {
                 .orElseThrow(() -> new IllegalArgumentException("Expense not found"));
 
         Long groupId = expense.getGroup().getId();
+
+        if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, actor.getId())) {
+            throw new IllegalArgumentException("Only group members can edit expenses.");
+        }
 
         // Validate sum of shares matches total amount
         BigDecimal totalShareSum = BigDecimal.ZERO;
@@ -156,18 +192,30 @@ public class ExpenseService {
         Expense expense = expenseRepository.findById(expenseId)
                 .orElseThrow(() -> new IllegalArgumentException("Expense not found"));
 
+        if (!groupMemberRepository.existsByGroupIdAndUserId(expense.getGroup().getId(), actor.getId())) {
+            throw new IllegalArgumentException("Only group members can delete expenses.");
+        }
+
         expenseRepository.delete(expense);
         activityLogService.log(actor, "Deleted expense \"" + expense.getDescription() + "\" from group " + expense.getGroup().getGroupName());
     }
 
     @Transactional(readOnly = true)
-    public Page<Expense> getGroupExpenses(Long groupId, Pageable pageable) {
+    public Page<Expense> getGroupExpenses(Long groupId, String category, Pageable pageable) {
+        if (category != null && !category.trim().isEmpty()) {
+            return expenseRepository.findByGroupIdAndCategory(groupId, category, pageable);
+        }
         return expenseRepository.findByGroupId(groupId, pageable);
     }
 
     @Transactional(readOnly = true)
     public List<Expense> getGroupExpensesList(Long groupId) {
         return expenseRepository.findByGroupId(groupId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ExpenseApproval> getPendingApprovalsForUser(Long userId) {
+        return expenseApprovalRepository.findByUserIdAndStatus(userId, "PENDING");
     }
 
     @Transactional(readOnly = true)
@@ -178,5 +226,60 @@ public class ExpenseService {
     @Transactional(readOnly = true)
     public Optional<Expense> getExpenseById(Long expenseId) {
         return expenseRepository.findById(expenseId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ExpenseApproval> getExpenseApprovals(Long expenseId) {
+        return expenseApprovalRepository.findByExpenseId(expenseId);
+    }
+
+    @Transactional
+    public void approveOrRejectExpense(Long expenseId, String status, String comment, User user) {
+        Expense expense = expenseRepository.findById(expenseId)
+                .orElseThrow(() -> new IllegalArgumentException("Expense not found"));
+
+        ExpenseApproval approval = expenseApprovalRepository.findByExpenseIdAndUserId(expenseId, user.getId())
+                .orElseThrow(() -> new IllegalArgumentException("You are not a participant in this expense"));
+
+        approval.setStatus(status);
+        approval.setComment(comment);
+        approval.setApprovedAt(java.time.LocalDateTime.now());
+        expenseApprovalRepository.save(approval);
+
+        if ("APPROVED".equalsIgnoreCase(status)) {
+            activityLogService.log(user, user.getFullName() + " approved expense \"" + expense.getDescription() + "\"");
+            
+            // Check if ALL participants approved
+            List<ExpenseApproval> approvals = expenseApprovalRepository.findByExpenseId(expenseId);
+            boolean allApproved = approvals.stream().allMatch(a -> "APPROVED".equalsIgnoreCase(a.getStatus()));
+            if (allApproved) {
+                expense.setVerificationStatus("VERIFIED");
+                expenseRepository.save(expense);
+                activityLogService.log(expense.getPaidBy(), "Expense \"" + expense.getDescription() + "\" became VERIFIED");
+                notificationService.createNotification(expense.getPaidBy(), "EXPENSE_CREATED", "Your expense \"" + expense.getDescription() + "\" is now VERIFIED.");
+            }
+        } else if ("REJECTED".equalsIgnoreCase(status)) {
+            expense.setVerificationStatus("UNDER_REVIEW");
+            expenseRepository.save(expense);
+            activityLogService.log(user, user.getFullName() + " rejected expense \"" + expense.getDescription() + "\"");
+            notificationService.createNotification(expense.getPaidBy(), "EXPENSE_REJECTED", user.getFullName() + " rejected expense \"" + expense.getDescription() + "\". Reason: " + comment);
+        } else if ("REQUESTED_PROOF".equalsIgnoreCase(status)) {
+            activityLogService.log(user, user.getFullName() + " requested proof for expense \"" + expense.getDescription() + "\"");
+            notificationService.createNotification(expense.getPaidBy(), "PROOF_REQUESTED", user.getFullName() + " requested receipt proof for expense \"" + expense.getDescription() + "\"");
+        }
+    }
+
+    @Transactional
+    public void uploadReceipt(Long expenseId, String receiptUrl, User actor) {
+        Expense expense = expenseRepository.findById(expenseId)
+                .orElseThrow(() -> new IllegalArgumentException("Expense not found"));
+
+        if (!expense.getPaidBy().getId().equals(actor.getId())) {
+            throw new IllegalArgumentException("Only the payer can upload proof.");
+        }
+
+        expense.setReceiptUrl(receiptUrl);
+        expenseRepository.save(expense);
+        activityLogService.log(actor, actor.getFullName() + " uploaded receipt proof for expense \"" + expense.getDescription() + "\"");
     }
 }

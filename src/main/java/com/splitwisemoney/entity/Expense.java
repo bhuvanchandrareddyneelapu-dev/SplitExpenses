@@ -33,12 +33,21 @@ public class Expense {
     @Column(name = "expense_date", nullable = false)
     private LocalDate expenseDate;
 
+    @Column(name = "verification_status", nullable = false, length = 20)
+    private String verificationStatus; // PENDING, VERIFIED, UNDER_REVIEW, REJECTED
+
+    @Column(name = "receipt_url", length = 255)
+    private String receiptUrl;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        if (verificationStatus == null) {
+            verificationStatus = "PENDING";
+        }
     }
 
     public Expense() {}
@@ -50,6 +59,7 @@ public class Expense {
         this.description = description;
         this.category = category;
         this.expenseDate = expenseDate;
+        this.verificationStatus = "PENDING";
     }
 
     // Getters and Setters
@@ -76,4 +86,10 @@ public class Expense {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public String getVerificationStatus() { return verificationStatus; }
+    public void setVerificationStatus(String verificationStatus) { this.verificationStatus = verificationStatus; }
+
+    public String getReceiptUrl() { return receiptUrl; }
+    public void setReceiptUrl(String receiptUrl) { this.receiptUrl = receiptUrl; }
 }

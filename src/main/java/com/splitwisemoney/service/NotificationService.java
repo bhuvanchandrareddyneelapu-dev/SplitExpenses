@@ -36,13 +36,6 @@ public class NotificationService {
 
     @Transactional
     public void markAllAsRead(User user) {
-        Page<Notification> unreadPage = notificationRepository.findByUserId(user.getId(), Pageable.unpaged());
-        List<Notification> notifications = unreadPage.getContent();
-        for (Notification notification : notifications) {
-            if (!notification.getIsRead()) {
-                notification.setIsRead(true);
-            }
-        }
-        notificationRepository.saveAll(notifications);
+        notificationRepository.markAllAsReadForUser(user.getId());
     }
 }

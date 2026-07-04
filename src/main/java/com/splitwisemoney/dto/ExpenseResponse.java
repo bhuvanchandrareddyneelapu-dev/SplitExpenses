@@ -14,8 +14,14 @@ public class ExpenseResponse {
     private String paidByName;
     private List<ParticipantShareDto> participants;
 
+    private String verificationStatus;
+    private String receiptUrl;
+    private List<ExpenseApprovalResponse> approvals;
+
     public ExpenseResponse(Long id, BigDecimal amount, String description, String category,
-                           LocalDate expenseDate, Long paidById, String paidByName, List<ParticipantShareDto> participants) {
+                           LocalDate expenseDate, Long paidById, String paidByName,
+                           List<ParticipantShareDto> participants, String verificationStatus, String receiptUrl,
+                           List<ExpenseApprovalResponse> approvals) {
         this.id = id;
         this.amount = amount;
         this.description = description;
@@ -24,6 +30,9 @@ public class ExpenseResponse {
         this.paidById = paidById;
         this.paidByName = paidByName;
         this.participants = participants;
+        this.verificationStatus = verificationStatus;
+        this.receiptUrl = receiptUrl;
+        this.approvals = approvals;
     }
 
     public Long getId() { return id; }
@@ -42,4 +51,10 @@ public class ExpenseResponse {
     public void setPaidByName(String paidByName) { this.paidByName = paidByName; }
     public List<ParticipantShareDto> getParticipants() { return participants; }
     public void setParticipants(List<ParticipantShareDto> participants) { this.participants = participants; }
+    public String getVerificationStatus() { return verificationStatus; }
+    public void setVerificationStatus(String verificationStatus) { this.verificationStatus = verificationStatus; }
+    public String getReceiptUrl() { return receiptUrl; }
+    public void setReceiptUrl(String receiptUrl) { this.receiptUrl = receiptUrl; }
+    public List<ExpenseApprovalResponse> getApprovals() { return approvals; }
+    public void setApprovals(List<ExpenseApprovalResponse> approvals) { this.approvals = approvals; }
 }

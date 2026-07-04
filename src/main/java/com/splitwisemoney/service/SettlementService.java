@@ -58,6 +58,9 @@ public class SettlementService {
 
         // 2. Add credit for expenses paid, and subtract debit for expense shares
         for (Expense expense : expenses) {
+            if (!"VERIFIED".equalsIgnoreCase(expense.getVerificationStatus())) {
+                continue;
+            }
             Long payeeId = expense.getPaidBy().getId();
             BigDecimal amount = expense.getAmount();
 
@@ -149,6 +152,14 @@ public class SettlementService {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found"));
 
+        if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, actor.getId())) {
+            throw new IllegalArgumentException("Only group members can record settlements.");
+        }
+
+        if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, fromUserId) || !groupMemberRepository.existsByGroupIdAndUserId(groupId, toUserId)) {
+            throw new IllegalArgumentException("Both settlement parties must be members of the group.");
+        }
+
         User fromUser = userRepository.findById(fromUserId)
                 .orElseThrow(() -> new IllegalArgumentException("Debtor user not found"));
 
@@ -160,9 +171,9 @@ public class SettlementService {
 
         if ("SETTLED".equalsIgnoreCase(status)) {
             activityLogService.log(actor, fromUser.getFullName() + " settled ₹" + amount + " to " + toUser.getFullName());
-            notificationService.createNotification(toUser, "SETTLEMENT_REMINDER", 
+            notificationService.createNotification(toUser, "SETTLEMENT_COMPLETED", 
                     fromUser.getFullName() + " recorded a settlement of ₹" + amount + " to you.");
-            notificationService.createNotification(fromUser, "SETTLEMENT_REMINDER", 
+            notificationService.createNotification(fromUser, "SETTLEMENT_COMPLETED", 
                     "You settled ₹" + amount + " to " + toUser.getFullName() + ".");
         } else {
             activityLogService.log(actor, "Recorded pending settlement: " + fromUser.getFullName() + " owe " + toUser.getFullName() + " ₹" + amount);
@@ -178,11 +189,15 @@ public class SettlementService {
         Settlement settlement = settlementRepository.findById(settlementId)
                 .orElseThrow(() -> new IllegalArgumentException("Settlement not found"));
 
+        if (!groupMemberRepository.existsByGroupIdAndUserId(settlement.getGroup().getId(), actor.getId())) {
+            throw new IllegalArgumentException("Only group members can settle debts.");
+        }
+
         settlement.setStatus("SETTLED");
         Settlement updated = settlementRepository.save(settlement);
 
         activityLogService.log(actor, settlement.getFromUser().getFullName() + " settled ₹" + settlement.getAmount() + " to " + settlement.getToUser().getFullName());
-        notificationService.createNotification(settlement.getToUser(), "SETTLEMENT_REMINDER", 
+        notificationService.createNotification(settlement.getToUser(), "SETTLEMENT_COMPLETED", 
                 settlement.getFromUser().getFullName() + " settled their debt of ₹" + settlement.getAmount() + " to you.");
         
         return updated;

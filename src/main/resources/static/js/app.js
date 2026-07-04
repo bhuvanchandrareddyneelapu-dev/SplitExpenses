@@ -79,6 +79,11 @@ const App = {
             document.getElementById('statTotalOwed').textContent = `₹${parseFloat(dashboardData.totalOwed).toFixed(2)}`;
             document.getElementById('statTotalReceive').textContent = `₹${parseFloat(dashboardData.amountToReceive).toFixed(2)}`;
             document.getElementById('statTotalGroups').textContent = dashboardData.totalGroups;
+            document.getElementById('statPendingInvitations').textContent = dashboardData.pendingInvitationsCount;
+            document.getElementById('statPendingApprovals').textContent = dashboardData.pendingApprovalsCount;
+            document.getElementById('statRejectedExpenses').textContent = dashboardData.rejectedExpensesCount;
+            document.getElementById('statVerifiedExpenses').textContent = dashboardData.verifiedExpensesCount;
+            document.getElementById('statPendingProofRequests').textContent = dashboardData.pendingProofRequestsCount;
 
             // Render activities
             const activityList = document.getElementById('recentActivityList');
@@ -232,6 +237,15 @@ const App = {
         this.loadGroupExpenses(groupId);
         this.loadGroupSettlements(groupId);
 
+        // Category Filter setup
+        const categoryFilter = document.getElementById('categoryFilter');
+        if (categoryFilter) {
+            categoryFilter.addEventListener('change', () => {
+                this.groupExpensesPage = 0;
+                this.loadGroupExpenses(groupId);
+            });
+        }
+
         // Edit Group Modal setup
         const editGroupForm = document.getElementById('editGroupForm');
         if (editGroupForm) {
@@ -274,10 +288,10 @@ const App = {
                 alertArea.classList.add('d-none');
                 
                 try {
-                    await API.post(`/api/groups/${groupId}/members`, { email });
+                    await API.post(`/api/groups/${groupId}/invite`, { email });
                     document.getElementById('newMemberEmail').value = '';
                     
-                    alertArea.textContent = 'Member added successfully!';
+                    alertArea.textContent = 'Invitation sent successfully!';
                     alertArea.className = 'alert border-0 text-white d-block';
                     alertArea.style.backgroundColor = 'var(--accent-emerald)';
                     
@@ -362,7 +376,13 @@ const App = {
     async loadGroupExpenses(groupId) {
         const expList = document.getElementById('expenseList');
         try {
-            const pageData = await API.get(`/api/expenses/group/${groupId}?page=${this.groupExpensesPage}&size=5&sort=expenseDate,desc`);
+            const categoryFilter = document.getElementById('categoryFilter');
+            const category = categoryFilter ? categoryFilter.value : '';
+            let url = `/api/expenses/group/${groupId}?page=${this.groupExpensesPage}&size=5&sort=expenseDate,desc`;
+            if (category) {
+                url += `&category=${encodeURIComponent(category)}`;
+            }
+            const pageData = await API.get(url);
             
             this.groupExpensesTotalPages = pageData.totalPages;
             
@@ -384,11 +404,72 @@ const App = {
                 // Construct participants breakdown
                 const partsHtml = exp.participants.map(p => `${p.fullName} (₹${parseFloat(p.shareAmount).toFixed(2)})`).join(', ');
 
+                // Status Badge
+                let statusBadge = '';
+                if (exp.verificationStatus === 'VERIFIED') {
+                    statusBadge = '<span class="badge bg-success ms-2">Verified</span>';
+                } else if (exp.verificationStatus === 'UNDER_REVIEW') {
+                    statusBadge = '<span class="badge bg-warning text-dark ms-2">Under Review</span>';
+                } else if (exp.verificationStatus === 'REJECTED') {
+                    statusBadge = '<span class="badge bg-danger ms-2">Rejected</span>';
+                } else {
+                    statusBadge = '<span class="badge bg-secondary ms-2">Pending Approval</span>';
+                }
+
+                // Receipt proof
+                let receiptHtml = '';
+                if (exp.receiptUrl) {
+                    receiptHtml = `
+                        <div class="mt-2">
+                            <a href="${exp.receiptUrl}" target="_blank" class="btn btn-sm btn-secondary-outline py-0 px-2 small text-indigo">
+                                <i class="fa-solid fa-file-image me-1"></i>View Receipt Proof
+                            </a>
+                        </div>
+                    `;
+                }
+
+                // Approvals checklist
+                let approvalsHtml = '';
+                if (exp.approvals && exp.approvals.length > 0) {
+                    const items = exp.approvals.map(a => {
+                        let symbol = '⏳';
+                        let color = 'text-secondary';
+                        if (a.status === 'APPROVED') {
+                            symbol = '✔';
+                            color = 'text-success';
+                        } else if (a.status === 'REJECTED') {
+                            symbol = '❌';
+                            color = 'text-danger';
+                        } else if (a.status === 'REQUESTED_PROOF') {
+                            symbol = '📷';
+                            color = 'text-warning';
+                        }
+                        const commentStr = a.comment ? ` (${a.comment})` : '';
+                        return `<span class="${color} me-3" style="font-size: 0.85rem;">${a.userName} ${symbol}${commentStr}</span>`;
+                    }).join('');
+                    approvalsHtml = `<div class="mt-2 border-top border-secondary pt-2"><strong>Verification:</strong> ${items}</div>`;
+                }
+
+                // Interactive approval buttons for the participant
+                let actionButtonsHtml = '';
+                if (this.currentUser && exp.approvals) {
+                    const myApproval = exp.approvals.find(a => a.userId === this.currentUser.id);
+                    if (myApproval && (myApproval.status === 'PENDING' || myApproval.status === 'REQUESTED_PROOF')) {
+                        actionButtonsHtml = `
+                            <div class="mt-2 d-flex gap-2">
+                                <button class="btn btn-sm btn-success text-white py-0 px-2" style="font-size: 0.8rem;" onclick="App.respondGroupExpenseApproval(${groupId}, ${exp.id}, 'APPROVED')">Approve</button>
+                                <button class="btn btn-sm btn-danger text-white py-0 px-2" style="font-size: 0.8rem;" onclick="App.respondGroupExpenseApprovalPrompt(${groupId}, ${exp.id}, 'REJECTED')">Reject</button>
+                                <button class="btn btn-sm btn-warning text-white py-0 px-2" style="font-size: 0.8rem;" onclick="App.respondGroupExpenseApproval(${groupId}, ${exp.id}, 'REQUESTED_PROOF')">Request Proof</button>
+                            </div>
+                        `;
+                    }
+                }
+
                 html += `
                     <div class="list-item-glass p-3 mb-3">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <div>
-                                <h5 class="fw-bold mb-1 text-white">${exp.description}</h5>
+                                <h5 class="fw-bold mb-1 text-white">${exp.description}${statusBadge}</h5>
                                 <span class="badge badge-category ${badgeClass} mb-2">${exp.category}</span>
                                 <p class="text-secondary mb-0 small">Paid by <strong>${exp.paidByName}</strong> on ${date}</p>
                             </div>
@@ -403,12 +484,32 @@ const App = {
                         <div class="border-top border-secondary pt-2 mt-2 small text-secondary">
                             <strong>Split between:</strong> ${partsHtml}
                         </div>
+                        ${receiptHtml}
+                        ${approvalsHtml}
+                        ${actionButtonsHtml}
                     </div>
                 `;
             });
             expList.innerHTML = html;
         } catch (err) {
             expList.innerHTML = `<p class="text-danger">${err.message}</p>`;
+        }
+    },
+
+    async respondGroupExpenseApproval(groupId, id, status, comment = '') {
+        try {
+            await API.post(`/api/expenses/${id}/approval`, { status, comment });
+            this.loadGroupExpenses(groupId);
+            this.loadGroupSettlements(groupId);
+        } catch (err) {
+            alert('Failed to submit approval: ' + err.message);
+        }
+    },
+
+    respondGroupExpenseApprovalPrompt(groupId, id, status) {
+        const reason = prompt('Please enter rejection reason:');
+        if (reason !== null) {
+            this.respondGroupExpenseApproval(groupId, id, status, reason);
         }
     },
 
@@ -628,20 +729,66 @@ const App = {
             // Compute participant shares map
             const participantShares = {};
             let selectedCount = 0;
-            
-            this.groupMembersCache.forEach(m => {
-                const chk = document.getElementById(`partChk_${m.id}`);
-                if (chk && chk.checked) {
-                    selectedCount++;
-                    const input = document.getElementById(`partInput_${m.id}`);
-                    participantShares[m.id] = parseFloat(input.value || 0);
-                }
-            });
+            const method = document.querySelector('input[name="splitMethod"]:checked').value;
 
-            if (selectedCount === 0) {
-                alertArea.textContent = 'Please select at least one participant.';
-                alertArea.classList.remove('d-none');
-                return;
+            if (method === 'PERCENT') {
+                let sumPercent = 0;
+                this.groupMembersCache.forEach(m => {
+                    const chk = document.getElementById(`partChk_${m.id}`);
+                    if (chk && chk.checked) {
+                        selectedCount++;
+                        const input = document.getElementById(`partInput_${m.id}`);
+                        sumPercent += parseFloat(input.value || 0);
+                    }
+                });
+
+                if (selectedCount === 0) {
+                    alertArea.textContent = 'Please select at least one participant.';
+                    alertArea.classList.remove('d-none');
+                    return;
+                }
+
+                if (Math.abs(sumPercent - 100) > 0.05) {
+                    alertArea.textContent = `The sum of percentages (${sumPercent.toFixed(2)}%) must equal 100%.`;
+                    alertArea.classList.remove('d-none');
+                    return;
+                }
+
+                // Convert percent to absolute amounts
+                let sumSoFar = 0;
+                const selectedIds = this.groupMembersCache
+                    .filter(m => {
+                        const chk = document.getElementById(`partChk_${m.id}`);
+                        return chk && chk.checked;
+                    })
+                    .map(m => m.id);
+
+                selectedIds.forEach((id, idx) => {
+                    const input = document.getElementById(`partInput_${id}`);
+                    const percent = parseFloat(input.value || 0);
+                    if (idx === selectedIds.length - 1) {
+                        participantShares[id] = parseFloat((amount - sumSoFar).toFixed(2));
+                    } else {
+                        const share = parseFloat(((percent / 100) * amount).toFixed(2));
+                        participantShares[id] = share;
+                        sumSoFar += share;
+                    }
+                });
+            } else {
+                this.groupMembersCache.forEach(m => {
+                    const chk = document.getElementById(`partChk_${m.id}`);
+                    if (chk && chk.checked) {
+                        selectedCount++;
+                        const input = document.getElementById(`partInput_${m.id}`);
+                        participantShares[m.id] = parseFloat(input.value || 0);
+                    }
+                });
+
+                if (selectedCount === 0) {
+                    alertArea.textContent = 'Please select at least one participant.';
+                    alertArea.classList.remove('d-none');
+                    return;
+                }
             }
 
             // Client side sum validation
@@ -657,8 +804,9 @@ const App = {
             }
 
             try {
+                let savedExpense;
                 if (expenseId) {
-                    await API.put(`/api/expenses/${expenseId}`, {
+                    savedExpense = await API.put(`/api/expenses/${expenseId}`, {
                         amount,
                         description,
                         category,
@@ -667,7 +815,7 @@ const App = {
                         participantShares
                     });
                 } else {
-                    await API.post(`/api/expenses/group/${groupId}`, {
+                    savedExpense = await API.post(`/api/expenses/group/${groupId}`, {
                         amount,
                         description,
                         category,
@@ -676,6 +824,31 @@ const App = {
                         participantShares
                     });
                 }
+
+                // Upload receipt if selected
+                const fileInput = document.getElementById('receiptFile');
+                if (fileInput && fileInput.files.length > 0) {
+                    const formData = new FormData();
+                    formData.append('file', fileInput.files[0]);
+
+                    const token = API.getToken();
+                    const headers = {};
+                    if (token) {
+                        headers['Authorization'] = 'Bearer ' + token;
+                    }
+
+                    const response = await fetch(`/api/expenses/${savedExpense.id}/receipt`, {
+                        method: 'POST',
+                        headers: headers,
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const errText = await response.text();
+                        throw new Error(errText || 'Failed to upload receipt');
+                    }
+                }
+
                 window.location.href = `group-details.html?id=${groupId}`;
             } catch (err) {
                 alertArea.textContent = err.message || 'Failed to submit expense.';
@@ -873,6 +1046,8 @@ const App = {
     async initNotifications() {
         await this.initHeader();
         this.loadNotifications();
+        this.loadPendingInvitations();
+        this.loadPendingExpenseApprovals();
 
         document.getElementById('btnMarkAllRead').addEventListener('click', async () => {
             try {
@@ -897,6 +1072,100 @@ const App = {
                 this.loadNotifications();
             }
         });
+    },
+
+    async loadPendingInvitations() {
+        const card = document.getElementById('invitationsCard');
+        const container = document.getElementById('invitationsContainer');
+        if (!card || !container) return;
+        try {
+            const list = await API.get('/api/groups/invitations');
+            if (list && list.length > 0) {
+                card.classList.remove('d-none');
+                let html = '';
+                list.forEach(inv => {
+                    html += `
+                        <div class="list-item-glass p-3 mb-2 d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="text-white fw-semibold">${inv.senderName}</span> invited you to join <span class="text-info fw-semibold">${inv.groupName}</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm text-white px-3" style="background-color: var(--accent-emerald);" onclick="App.respondInvitation(${inv.id}, 'accept')">Accept</button>
+                                <button class="btn btn-sm text-white px-3" style="background-color: var(--accent-rose);" onclick="App.respondInvitation(${inv.id}, 'reject')">Reject</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            } else {
+                card.classList.add('d-none');
+            }
+        } catch (err) {
+            console.error('Failed to load pending invitations', err);
+        }
+    },
+
+    async respondInvitation(id, action) {
+        try {
+            await API.post(`/api/groups/invitations/${id}/${action}`, {});
+            this.loadPendingInvitations();
+            this.loadNotifications();
+            this.loadUnreadNotificationCount();
+        } catch (err) {
+            alert('Failed to respond to invitation: ' + err.message);
+        }
+    },
+
+    async loadPendingExpenseApprovals() {
+        const card = document.getElementById('approvalsCard');
+        const container = document.getElementById('approvalsContainer');
+        if (!card || !container) return;
+        try {
+            const list = await API.get('/api/expenses/pending-approvals');
+            if (list && list.length > 0) {
+                card.classList.remove('d-none');
+                let html = '';
+                list.forEach(appr => {
+                    html += `
+                        <div class="list-item-glass p-3 mb-2">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="text-white small">${appr.userName}</span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-success text-white" onclick="App.respondExpenseApproval(${appr.id}, 'APPROVED')">Approve</button>
+                                    <button class="btn btn-sm btn-danger text-white" onclick="App.respondExpenseApprovalPrompt(${appr.id}, 'REJECTED')">Reject</button>
+                                    <button class="btn btn-sm btn-warning text-white" onclick="App.respondExpenseApproval(${appr.id}, 'REQUESTED_PROOF')">Request Proof</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            } else {
+                card.classList.add('d-none');
+            }
+        } catch (err) {
+            console.error('Failed to load pending approvals', err);
+        }
+    },
+
+    async respondExpenseApproval(id, status, comment = '') {
+        try {
+            await API.post(`/api/expenses/${id}/approval`, { status, comment });
+            this.loadPendingExpenseApprovals();
+            this.loadNotifications();
+            this.loadUnreadNotificationCount();
+        } catch (err) {
+            alert('Failed to submit approval: ' + err.message);
+        }
+    },
+
+    respondExpenseApprovalPrompt(id, status) {
+        const reason = prompt('Please enter rejection reason:');
+        if (reason !== null) {
+            this.respondExpenseApproval(id, status, reason);
+        }
     },
 
     async loadNotifications() {

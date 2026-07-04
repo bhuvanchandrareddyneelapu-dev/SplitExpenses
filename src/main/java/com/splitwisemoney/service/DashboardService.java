@@ -20,17 +20,23 @@ public class DashboardService {
     private final ExpenseParticipantRepository expenseParticipantRepository;
     private final SettlementRepository settlementRepository;
     private final ActivityLogRepository activityLogRepository;
+    private final GroupInvitationRepository groupInvitationRepository;
+    private final ExpenseApprovalRepository expenseApprovalRepository;
 
     public DashboardService(GroupMemberRepository groupMemberRepository,
                             ExpenseRepository expenseRepository,
                             ExpenseParticipantRepository expenseParticipantRepository,
                             SettlementRepository settlementRepository,
-                            ActivityLogRepository activityLogRepository) {
+                            ActivityLogRepository activityLogRepository,
+                            GroupInvitationRepository groupInvitationRepository,
+                            ExpenseApprovalRepository expenseApprovalRepository) {
         this.groupMemberRepository = groupMemberRepository;
         this.expenseRepository = expenseRepository;
         this.expenseParticipantRepository = expenseParticipantRepository;
         this.settlementRepository = settlementRepository;
         this.activityLogRepository = activityLogRepository;
+        this.groupInvitationRepository = groupInvitationRepository;
+        this.expenseApprovalRepository = expenseApprovalRepository;
     }
 
     @Transactional(readOnly = true)
@@ -42,15 +48,7 @@ public class DashboardService {
         int totalGroups = memberships.size();
 
         // 2. Compute Total Paid (sum of all expenses paid by the user)
-        BigDecimal totalPaid = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        for (GroupMember membership : memberships) {
-            List<Expense> groupExpenses = expenseRepository.findByGroupId(membership.getGroup().getId());
-            for (Expense expense : groupExpenses) {
-                if (expense.getPaidBy().getId().equals(userId)) {
-                    totalPaid = totalPaid.add(expense.getAmount());
-                }
-            }
-        }
+        BigDecimal totalPaid = expenseRepository.sumAmountByPaidById(userId).setScale(2, RoundingMode.HALF_UP);
 
         // 3. Compute current Net Owed and Net Receive across all groups
         BigDecimal totalOwed = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
@@ -58,34 +56,16 @@ public class DashboardService {
 
         for (GroupMember membership : memberships) {
             Long groupId = membership.getGroup().getId();
-            List<Expense> groupExpenses = expenseRepository.findByGroupId(groupId);
-            List<Settlement> groupSettlements = settlementRepository.findByGroupId(groupId);
 
-            BigDecimal groupBalance = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            BigDecimal groupPaid = expenseRepository.sumAmountByGroupIdAndPaidById(groupId, userId);
+            BigDecimal groupOwedShare = expenseParticipantRepository.sumShareAmountByGroupIdAndUserId(groupId, userId);
+            BigDecimal settledFrom = settlementRepository.sumSettledAmountByGroupIdAndFromUserId(groupId, userId);
+            BigDecimal settledTo = settlementRepository.sumSettledAmountByGroupIdAndToUserId(groupId, userId);
 
-            for (Expense expense : groupExpenses) {
-                if (expense.getPaidBy().getId().equals(userId)) {
-                    groupBalance = groupBalance.add(expense.getAmount());
-                }
-
-                List<ExpenseParticipant> participants = expenseParticipantRepository.findByExpenseId(expense.getId());
-                for (ExpenseParticipant participant : participants) {
-                    if (participant.getUser().getId().equals(userId)) {
-                        groupBalance = groupBalance.subtract(participant.getShareAmount());
-                    }
-                }
-            }
-
-            for (Settlement settlement : groupSettlements) {
-                if ("SETTLED".equalsIgnoreCase(settlement.getStatus())) {
-                    if (settlement.getFromUser().getId().equals(userId)) {
-                        groupBalance = groupBalance.add(settlement.getAmount());
-                    }
-                    if (settlement.getToUser().getId().equals(userId)) {
-                        groupBalance = groupBalance.subtract(settlement.getAmount());
-                    }
-                }
-            }
+            BigDecimal groupBalance = groupPaid.subtract(groupOwedShare)
+                    .add(settledFrom)
+                    .subtract(settledTo)
+                    .setScale(2, RoundingMode.HALF_UP);
 
             if (groupBalance.compareTo(BigDecimal.ZERO) > 0) {
                 amountToReceive = amountToReceive.add(groupBalance);
@@ -98,7 +78,15 @@ public class DashboardService {
         Pageable topFive = PageRequest.of(0, 5, Sort.by("createdAt").descending());
         List<ActivityLog> recentActivities = activityLogRepository.findByUserId(userId, topFive).getContent();
 
-        return new DashboardData(totalPaid, totalOwed, amountToReceive, totalGroups, recentActivities);
+        int pendingInvitations = groupInvitationRepository.findByReceiverIdAndStatus(userId, "PENDING").size();
+        int pendingApprovals = expenseApprovalRepository.findByUserIdAndStatus(userId, "PENDING").size();
+        int rejectedExpenses = (int) expenseRepository.countByPaidByIdAndVerificationStatus(userId, "UNDER_REVIEW")
+                + (int) expenseRepository.countByPaidByIdAndVerificationStatus(userId, "REJECTED");
+        int verifiedExpenses = (int) expenseRepository.countByPaidByIdAndVerificationStatus(userId, "VERIFIED");
+        int pendingProofRequests = (int) expenseApprovalRepository.countByExpensePaidByIdAndStatus(userId, "REQUESTED_PROOF");
+
+        return new DashboardData(totalPaid, totalOwed, amountToReceive, totalGroups, recentActivities,
+                pendingInvitations, pendingApprovals, rejectedExpenses, verifiedExpenses, pendingProofRequests);
     }
 
     public static class DashboardData {
@@ -107,13 +95,25 @@ public class DashboardService {
         private final BigDecimal amountToReceive;
         private final int totalGroups;
         private final List<ActivityLog> recentActivities;
+        private final int pendingInvitations;
+        private final int pendingApprovals;
+        private final int rejectedExpenses;
+        private final int verifiedExpenses;
+        private final int pendingProofRequests;
 
-        public DashboardData(BigDecimal totalPaid, BigDecimal totalOwed, BigDecimal amountToReceive, int totalGroups, List<ActivityLog> recentActivities) {
+        public DashboardData(BigDecimal totalPaid, BigDecimal totalOwed, BigDecimal amountToReceive, int totalGroups,
+                             List<ActivityLog> recentActivities, int pendingInvitations, int pendingApprovals,
+                             int rejectedExpenses, int verifiedExpenses, int pendingProofRequests) {
             this.totalPaid = totalPaid;
             this.totalOwed = totalOwed;
             this.amountToReceive = amountToReceive;
             this.totalGroups = totalGroups;
             this.recentActivities = recentActivities;
+            this.pendingInvitations = pendingInvitations;
+            this.pendingApprovals = pendingApprovals;
+            this.rejectedExpenses = rejectedExpenses;
+            this.verifiedExpenses = verifiedExpenses;
+            this.pendingProofRequests = pendingProofRequests;
         }
 
         public BigDecimal getTotalPaid() { return totalPaid; }
@@ -121,5 +121,10 @@ public class DashboardService {
         public BigDecimal getAmountToReceive() { return amountToReceive; }
         public int getTotalGroups() { return totalGroups; }
         public List<ActivityLog> getRecentActivities() { return recentActivities; }
+        public int getPendingInvitations() { return pendingInvitations; }
+        public int getPendingApprovals() { return pendingApprovals; }
+        public int getRejectedExpenses() { return rejectedExpenses; }
+        public int getVerifiedExpenses() { return verifiedExpenses; }
+        public int getPendingProofRequests() { return pendingProofRequests; }
     }
 }

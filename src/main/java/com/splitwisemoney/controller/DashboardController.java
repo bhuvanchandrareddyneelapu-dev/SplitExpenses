@@ -56,7 +56,12 @@ public class DashboardController {
                 data.getTotalOwed(),
                 data.getAmountToReceive(),
                 data.getTotalGroups(),
-                recentActivities
+                recentActivities,
+                data.getPendingInvitations(),
+                data.getPendingApprovals(),
+                data.getRejectedExpenses(),
+                data.getVerifiedExpenses(),
+                data.getPendingProofRequests()
         );
 
         return ResponseEntity.ok(response);

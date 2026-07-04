@@ -68,6 +68,10 @@ public class GroupController {
     @GetMapping("/{id}")
     @Operation(summary = "Get specific group details by ID")
     public ResponseEntity<GroupResponse> getGroupById(@PathVariable Long id) {
+        User user = getAuthenticatedUser();
+        if (!groupService.isMember(id, user.getId())) {
+            throw new IllegalArgumentException("You are not a member of this group.");
+        }
         Group group = groupService.getGroupById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found"));
         return ResponseEntity.ok(mapToGroupResponse(group));
@@ -92,6 +96,10 @@ public class GroupController {
     @GetMapping("/{id}/members")
     @Operation(summary = "Get all member users in a group")
     public ResponseEntity<List<UserProfile>> getGroupMembers(@PathVariable Long id) {
+        User user = getAuthenticatedUser();
+        if (!groupService.isMember(id, user.getId())) {
+            throw new IllegalArgumentException("You are not a member of this group.");
+        }
         List<User> members = groupService.getGroupMembers(id);
         List<UserProfile> response = members.stream()
                 .map(u -> new UserProfile(u.getId(), u.getFullName(), u.getEmail(), u.getCreatedAt()))
@@ -113,5 +121,55 @@ public class GroupController {
         User user = getAuthenticatedUser();
         groupService.removeMember(id, userId, user);
         return ResponseEntity.ok("Member removed successfully");
+    }
+
+    @PostMapping("/{id}/invite")
+    @Operation(summary = "Invite a user member to a group by their registered email")
+    public ResponseEntity<InvitationResponse> inviteMember(@PathVariable Long id, @Valid @RequestBody InviteMemberRequest request) {
+        User user = getAuthenticatedUser();
+        com.splitwisemoney.entity.GroupInvitation invitation = groupService.inviteMemberByEmail(id, request.getEmail(), user);
+        InvitationResponse response = new InvitationResponse(
+                invitation.getId(),
+                invitation.getGroup().getId(),
+                invitation.getGroup().getGroupName(),
+                invitation.getSender().getFullName(),
+                invitation.getStatus(),
+                invitation.getCreatedAt()
+        );
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/invitations")
+    @Operation(summary = "List all pending invitations for current user")
+    public ResponseEntity<List<InvitationResponse>> getPendingInvitations() {
+        User user = getAuthenticatedUser();
+        List<com.splitwisemoney.entity.GroupInvitation> invitations = groupService.getPendingInvitations(user.getId());
+        List<InvitationResponse> response = invitations.stream()
+                .map(inv -> new InvitationResponse(
+                        inv.getId(),
+                        inv.getGroup().getId(),
+                        inv.getGroup().getGroupName(),
+                        inv.getSender().getFullName(),
+                        inv.getStatus(),
+                        inv.getCreatedAt()
+                ))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/invitations/{id}/accept")
+    @Operation(summary = "Accept a group invitation")
+    public ResponseEntity<String> acceptInvitation(@PathVariable Long id) {
+        User user = getAuthenticatedUser();
+        groupService.acceptInvitation(id, user);
+        return ResponseEntity.ok("Invitation accepted successfully");
+    }
+
+    @PostMapping("/invitations/{id}/reject")
+    @Operation(summary = "Reject a group invitation")
+    public ResponseEntity<String> rejectInvitation(@PathVariable Long id) {
+        User user = getAuthenticatedUser();
+        groupService.rejectInvitation(id, user);
+        return ResponseEntity.ok("Invitation rejected successfully");
     }
 }
