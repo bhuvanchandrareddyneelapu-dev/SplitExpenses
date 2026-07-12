@@ -20,8 +20,12 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
         Map<String, Object> overrides = new HashMap<>();
 
-        // Intercept and normalize SPRING_DATASOURCE_URL
-        String url = environment.getProperty("SPRING_DATASOURCE_URL");
+        // Intercept and normalize DATABASE_URL or SPRING_DATASOURCE_URL
+        String url = environment.getProperty("DATABASE_URL");
+        if (url == null || url.trim().isEmpty()) {
+            url = environment.getProperty("SPRING_DATASOURCE_URL");
+        }
+
         if (url != null && url.startsWith("postgresql://")) {
             overrides.put("spring.datasource.url", "jdbc:" + url);
         }
