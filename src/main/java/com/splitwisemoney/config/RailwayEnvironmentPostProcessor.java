@@ -27,7 +27,29 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
         }
 
         if (url != null && url.startsWith("postgresql://")) {
-            overrides.put("spring.datasource.url", "jdbc:" + url);
+            try {
+                java.net.URI uri = new java.net.URI(url);
+                String userInfo = uri.getUserInfo();
+                if (userInfo != null) {
+                    String[] parts = userInfo.split(":", 2);
+                    if (parts.length > 0) {
+                        overrides.put("spring.datasource.username", parts[0]);
+                    }
+                    if (parts.length > 1) {
+                        overrides.put("spring.datasource.password", parts[1]);
+                    }
+                }
+                
+                String host = uri.getHost();
+                int port = uri.getPort() != -1 ? uri.getPort() : 5432;
+                String path = uri.getPath();
+                
+                String jdbcUrl = "jdbc:postgresql://" + host + ":" + port + (path != null ? path : "");
+                overrides.put("spring.datasource.url", jdbcUrl);
+            } catch (java.net.URISyntaxException e) {
+                // Fallback to basic prepending if URI parsing fails
+                overrides.put("spring.datasource.url", "jdbc:" + url);
+            }
         }
 
         // If Railway assigned a PORT, we are in the cloud. Force prod profile if not explicitly set.
