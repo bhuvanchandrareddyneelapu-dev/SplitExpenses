@@ -69,70 +69,137 @@ const App = {
     // 1. DASHBOARD PAGE
     // ==========================================
     async initDashboard() {
+        console.log('Initializing Dashboard...');
         await this.initHeader();
-        
+        this.loadDashboardData();
+        this.loadQuickGroups();
+    },
+
+    async loadDashboardData() {
+        const activityList = document.getElementById('recentActivityList');
+        console.log('Loading Dashboard Summary...');
         try {
             const dashboardData = await API.get('/api/dashboard');
+            console.log('Dashboard Summary Response:', dashboardData);
             
             // Set stats
-            document.getElementById('statTotalPaid').textContent = `₹${parseFloat(dashboardData.totalPaid).toFixed(2)}`;
-            document.getElementById('statTotalOwed').textContent = `₹${parseFloat(dashboardData.totalOwed).toFixed(2)}`;
-            document.getElementById('statTotalReceive').textContent = `₹${parseFloat(dashboardData.amountToReceive).toFixed(2)}`;
-            document.getElementById('statTotalGroups').textContent = dashboardData.totalGroups;
-            document.getElementById('statPendingInvitations').textContent = dashboardData.pendingInvitationsCount;
-            document.getElementById('statPendingApprovals').textContent = dashboardData.pendingApprovalsCount;
-            document.getElementById('statRejectedExpenses').textContent = dashboardData.rejectedExpensesCount;
-            document.getElementById('statVerifiedExpenses').textContent = dashboardData.verifiedExpensesCount;
-            document.getElementById('statPendingProofRequests').textContent = dashboardData.pendingProofRequestsCount;
+            const setStat = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = val;
+            };
+            
+            setStat('statTotalPaid', `₹${parseFloat(dashboardData.totalPaid || 0).toFixed(2)}`);
+            setStat('statTotalOwed', `₹${parseFloat(dashboardData.totalOwed || 0).toFixed(2)}`);
+            setStat('statTotalReceive', `₹${parseFloat(dashboardData.amountToReceive || 0).toFixed(2)}`);
+            setStat('statTotalGroups', dashboardData.totalGroups || 0);
+            setStat('statPendingInvitations', dashboardData.pendingInvitationsCount || 0);
+            setStat('statPendingApprovals', dashboardData.pendingApprovalsCount || 0);
+            setStat('statRejectedExpenses', dashboardData.rejectedExpensesCount || 0);
+            setStat('statVerifiedExpenses', dashboardData.verifiedExpensesCount || 0);
+            setStat('statPendingProofRequests', dashboardData.pendingProofRequestsCount || 0);
 
             // Render activities
-            const activityList = document.getElementById('recentActivityList');
-            if (dashboardData.recentActivities.length === 0) {
-                activityList.innerHTML = `<p class="text-secondary text-center py-4">No recent activity logs.</p>`;
-            } else {
-                let html = '<div class="timeline-log">';
-                dashboardData.recentActivities.forEach(act => {
-                    const date = new Date(act.createdAt).toLocaleString();
-                    html += `
-                        <div class="list-item-glass mb-3 p-3">
-                            <div class="d-flex justify-content-between">
-                                <span class="fw-medium">${act.action}</span>
-                                <span class="text-secondary small">${date}</span>
-                            </div>
+            if (activityList) {
+                if (!dashboardData.recentActivities || dashboardData.recentActivities.length === 0) {
+                    console.log('Recent Activities: empty');
+                    activityList.innerHTML = `
+                        <div class="text-center py-5 text-secondary">
+                            <i class="fa-solid fa-history fs-2 mb-3 opacity-50"></i>
+                            <p class="mb-0">No recent activities yet.</p>
+                            <p class="small text-secondary">Start by creating your first expense.</p>
                         </div>
                     `;
-                });
-                html += '</div>';
-                activityList.innerHTML = html;
-            }
-
-            // Load Quick Groups
-            const groups = await API.get('/api/groups');
-            const quickGroupList = document.getElementById('quickGroupList');
-            if (groups.length === 0) {
-                quickGroupList.innerHTML = `
-                    <div class="text-center py-4">
-                        <p class="text-secondary mb-3">You are not in any groups yet.</p>
-                        <a href="groups.html" class="btn btn-primary-glow btn-sm">Create / Join Group</a>
-                    </div>
-                `;
-            } else {
-                let html = '<div class="list-group">';
-                // Show top 4
-                groups.slice(0, 4).forEach(group => {
-                    html += `
-                        <a href="group-details.html?id=${group.id}" class="list-group-item list-group-item-action list-item-glass d-flex justify-content-between align-items-center mb-2">
-                            <span class="fw-semibold text-white"><i class="fa-solid fa-folder-open me-2 text-indigo"></i>${group.groupName}</span>
-                            <span class="text-secondary small">Created by ${group.createdByName}</span>
-                        </a>
-                    `;
-                });
-                html += '</div>';
-                quickGroupList.innerHTML = html;
+                } else {
+                    console.log('Recent Activities loaded:', dashboardData.recentActivities.length, 'items');
+                    let html = '<div class="timeline-log">';
+                    dashboardData.recentActivities.forEach(act => {
+                        const date = new Date(act.createdAt).toLocaleString();
+                        html += `
+                            <div class="list-item-glass mb-3 p-3">
+                                <div class="d-flex justify-content-between">
+                                    <span class="fw-medium">${act.action}</span>
+                                    <span class="text-secondary small">${date}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    activityList.innerHTML = html;
+                }
             }
         } catch (err) {
-            console.error('Failed to load dashboard data', err);
+            console.error('Error loading dashboard data:', err);
+            if (activityList) {
+                activityList.innerHTML = `
+                    <div class="text-center py-5 text-danger">
+                        <i class="fa-solid fa-triangle-exclamation fs-2 mb-3"></i>
+                        <p class="mb-0 text-white fw-semibold">Unable to load Recent Activities.</p>
+                        <p class="small text-secondary mb-3">Please try again.</p>
+                        <button class="btn btn-sm btn-secondary-outline" onclick="App.loadDashboardData()">Retry</button>
+                    </div>
+                `;
+            }
         }
+    },
+
+    async loadQuickGroups() {
+        const quickGroupList = document.getElementById('quickGroupList');
+        console.log('Loading Quick Groups...');
+        try {
+            const groups = await API.get('/api/groups');
+            console.log('Quick Groups loaded:', groups ? groups.length : 0, 'groups');
+            if (quickGroupList) {
+                if (!groups || groups.length === 0) {
+                    quickGroupList.innerHTML = `
+                        <div class="text-center py-5 text-secondary">
+                            <i class="fa-solid fa-users-slash fs-2 mb-3 opacity-50"></i>
+                            <p class="mb-0">No groups yet.</p>
+                            <p class="small text-secondary mb-3">Create your first group.</p>
+                            <a href="groups.html" class="btn btn-primary-glow btn-sm"><i class="fa-solid fa-plus me-1"></i>Create Group</a>
+                        </div>
+                    `;
+                } else {
+                    let html = '<div class="list-group">';
+                    // Show top 4
+                    groups.slice(0, 4).forEach(group => {
+                        html += `
+                            <a href="group-details.html?id=${group.id}" class="list-group-item list-group-item-action list-item-glass d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-semibold text-white"><i class="fa-solid fa-folder-open me-2 text-indigo"></i>${group.groupName}</span>
+                                <span class="text-secondary small">Created by ${group.createdByName}</span>
+                            </a>
+                        `;
+                    });
+                    html += '</div>';
+                    quickGroupList.innerHTML = html;
+                }
+            }
+        } catch (err) {
+            console.error('Error loading groups:', err);
+            if (quickGroupList) {
+                quickGroupList.innerHTML = `
+                    <div class="text-center py-5 text-danger">
+                        <i class="fa-solid fa-triangle-exclamation fs-2 mb-3"></i>
+                        <p class="mb-0 text-white fw-semibold">Unable to load Quick Groups.</p>
+                        <p class="small text-secondary mb-3">Please try again.</p>
+                        <button class="btn btn-sm btn-secondary-outline" onclick="App.loadQuickGroups()">Retry</button>
+                    </div>
+                `;
+            }
+        }
+    },
+
+    /**
+     * Refreshes dashboard counters and activity list.
+     * Safe to call from any page — silently no-ops if dashboard elements are absent.
+     */
+    triggerDashboardRefresh() {
+        console.log('Dashboard refresh triggered');
+        // Only reload dashboard data if we are on the dashboard page
+        if (document.getElementById('recentActivityList') || document.getElementById('quickGroupList')) {
+            this.loadDashboardData();
+            this.loadQuickGroups();
+        }
+        this.loadUnreadNotificationCount();
     },
 
     // ==========================================
@@ -180,8 +247,12 @@ const App = {
             if (groups.length === 0) {
                 grid.innerHTML = `
                     <div class="col-12 text-center py-5 text-secondary">
-                        <i class="fa-solid fa-users-slash fs-1 mb-3"></i>
-                        <p class="fs-5">No groups found. Create one to start sharing expenses!</p>
+                        <i class="fa-solid fa-users-slash fs-1 mb-3 d-block"></i>
+                        <p class="fs-5 fw-semibold text-white mb-2">You haven't joined any groups yet.</p>
+                        <p class="mb-4">Create your first group to start splitting expenses with friends!</p>
+                        <button class="btn btn-primary-glow" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+                            <i class="fa-solid fa-plus me-2"></i>Create your first group
+                        </button>
                     </div>
                 `;
                 return;
@@ -443,6 +514,9 @@ const App = {
                         } else if (a.status === 'REQUESTED_PROOF') {
                             symbol = '📷';
                             color = 'text-warning';
+                        } else if (a.status === 'SUBMITTED') {
+                            symbol = '📤';
+                            color = 'text-info';
                         }
                         const commentStr = a.comment ? ` (${a.comment})` : '';
                         return `<span class="${color} me-3" style="font-size: 0.85rem;">${a.userName} ${symbol}${commentStr}</span>`;
@@ -454,7 +528,7 @@ const App = {
                 let actionButtonsHtml = '';
                 if (this.currentUser && exp.approvals) {
                     const myApproval = exp.approvals.find(a => a.userId === this.currentUser.id);
-                    if (myApproval && (myApproval.status === 'PENDING' || myApproval.status === 'REQUESTED_PROOF')) {
+                    if (myApproval && (myApproval.status === 'PENDING' || myApproval.status === 'REQUESTED_PROOF' || myApproval.status === 'SUBMITTED')) {
                         actionButtonsHtml = `
                             <div class="mt-2 d-flex gap-2">
                                 <button class="btn btn-sm btn-success text-white py-0 px-2" style="font-size: 0.8rem;" onclick="App.respondGroupExpenseApproval(${groupId}, ${exp.id}, 'APPROVED')">Approve</button>
@@ -501,6 +575,7 @@ const App = {
             await API.post(`/api/expenses/${id}/approval`, { status, comment });
             this.loadGroupExpenses(groupId);
             this.loadGroupSettlements(groupId);
+            this.triggerDashboardRefresh();
         } catch (err) {
             alert('Failed to submit approval: ' + err.message);
         }
@@ -519,6 +594,7 @@ const App = {
                 await API.delete(`/api/expenses/${expenseId}`);
                 this.loadGroupExpenses(groupId);
                 this.loadGroupSettlements(groupId);
+                this.triggerDashboardRefresh();
             } catch (err) {
                 alert('Failed to delete expense: ' + err.message);
             }
@@ -606,6 +682,7 @@ const App = {
                 
                 // Trigger global badge update
                 this.loadUnreadNotificationCount();
+                this.triggerDashboardRefresh();
             } catch (err) {
                 alert('Failed to record settlement: ' + err.message);
             }
@@ -1111,6 +1188,7 @@ const App = {
             this.loadPendingInvitations();
             this.loadNotifications();
             this.loadUnreadNotificationCount();
+            this.triggerDashboardRefresh();
         } catch (err) {
             alert('Failed to respond to invitation: ' + err.message);
         }
@@ -1126,10 +1204,11 @@ const App = {
                 card.classList.remove('d-none');
                 let html = '';
                 list.forEach(appr => {
+                    const statusText = appr.status === 'SUBMITTED' ? ' <span class="badge bg-info ms-2">Proof Submitted</span>' : '';
                     html += `
                         <div class="list-item-glass p-3 mb-2">
                             <div class="d-flex justify-content-between align-items-start mb-2">
-                                <span class="text-white small">${appr.userName}</span>
+                                <span class="text-white small">${appr.userName}${statusText}</span>
                             </div>
                             <div class="d-flex justify-content-between align-items-center">
                                 <div class="d-flex gap-2">
@@ -1156,6 +1235,7 @@ const App = {
             this.loadPendingExpenseApprovals();
             this.loadNotifications();
             this.loadUnreadNotificationCount();
+            this.triggerDashboardRefresh();
         } catch (err) {
             alert('Failed to submit approval: ' + err.message);
         }
@@ -1287,5 +1367,405 @@ const App = {
                 alertArea.style.backgroundColor = 'var(--accent-rose)';
             }
         });
+    },
+
+    // ==========================================
+    // 9. PROOF REQUESTS PAGE
+    // ==========================================
+    async initProofRequests() {
+        console.log('Initializing Proof Requests page...');
+        await this.initHeader();
+        this.loadProofRequests();
+    },
+
+    async loadProofRequests() {
+        const container = document.getElementById('proofRequestsContainer');
+        if (!container) return;
+        
+        console.log('Loading Pending Proof Requests...');
+        try {
+            const list = await API.get('/api/expenses/pending-proof-requests');
+            console.log('Pending Proof API Response:', list);
+            if (!list || list.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-5 text-secondary">
+                        <i class="fa-solid fa-image fs-1 mb-3 opacity-50" style="color: var(--accent-indigo);"></i>
+                        <p class="fs-5 fw-semibold text-white mb-2">No pending proof requests.</p>
+                        <p class="mb-0 text-secondary">You are all caught up!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            list.forEach(req => {
+                const date = new Date(req.expenseDate).toLocaleDateString();
+                html += `
+                    <div class="list-item-glass p-4 mb-3">
+                        <div class="row align-items-center">
+                            <div class="col-md-7">
+                                <h5 class="fw-bold text-white mb-1">${req.expenseDescription}</h5>
+                                <p class="text-secondary mb-2">
+                                    Requested By: <strong>${req.requestedByName}</strong> | Date: ${date}
+                                </p>
+                                <div class="badge bg-warning text-dark px-3 py-2">Comment: ${req.comment || 'No explanation provided'}</div>
+                            </div>
+                            <div class="col-md-5 text-end mt-3 mt-md-0">
+                                <h4 class="fw-bold text-white mb-3">₹${parseFloat(req.amount).toFixed(2)}</h4>
+                                <div class="d-flex gap-2 justify-content-md-end">
+                                    <input type="file" id="file_${req.expenseId}" accept="image/*,application/pdf" class="form-control form-glass form-control-sm d-none" onchange="App.onProofFileSelected(${req.expenseId})">
+                                    <button class="btn btn-sm btn-secondary-outline" id="btnSelect_${req.expenseId}" onclick="document.getElementById('file_${req.expenseId}').click()">
+                                        <i class="fa-solid fa-file-arrow-up me-1"></i>Select Proof
+                                    </button>
+                                    <button class="btn btn-sm btn-primary-glow d-none" id="btnSubmit_${req.expenseId}" onclick="App.submitProof(${req.expenseId})">
+                                        Submit
+                                    </button>
+                                </div>
+                                <span id="fileNameDisplay_${req.expenseId}" class="text-secondary small d-block mt-1"></span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        } catch (err) {
+            console.error('Error loading proof requests:', err);
+            container.innerHTML = `
+                <div class="text-center py-5 text-danger">
+                    <i class="fa-solid fa-triangle-exclamation fs-2 mb-3"></i>
+                    <p class="mb-0 text-white fw-semibold">Unable to load Proof Requests.</p>
+                    <p class="small text-secondary mb-3">Please try again.</p>
+                    <button class="btn btn-sm btn-secondary-outline" onclick="App.loadProofRequests()">Retry</button>
+                </div>
+            `;
+        }
+    },
+
+    onProofFileSelected(expenseId) {
+        const fileInput = document.getElementById(`file_${expenseId}`);
+        const display = document.getElementById(`fileNameDisplay_${expenseId}`);
+        const btnSubmit = document.getElementById(`btnSubmit_${expenseId}`);
+        const btnSelect = document.getElementById(`btnSelect_${expenseId}`);
+        
+        if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            display.textContent = file.name;
+            btnSubmit.classList.remove('d-none');
+            btnSelect.textContent = "Change File";
+        } else {
+            display.textContent = "";
+            btnSubmit.classList.add('d-none');
+            btnSelect.textContent = "Select Proof";
+        }
+    },
+
+    async submitProof(expenseId) {
+        const fileInput = document.getElementById(`file_${expenseId}`);
+        if (fileInput.files.length === 0) return;
+        
+        console.log('Submitting proof for expense:', expenseId);
+        try {
+            const file = fileInput.files[0];
+            const display = document.getElementById(`fileNameDisplay_${expenseId}`);
+            display.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin me-1"></i>Uploading...`;
+            
+            await API.uploadFile(`/api/expenses/${expenseId}/receipt`, file);
+            
+            console.log('Proof uploaded successfully for expense:', expenseId);
+            alert('Proof uploaded successfully!');
+            this.loadProofRequests();
+            this.triggerDashboardRefresh();
+        } catch (err) {
+            console.error('Error uploading proof:', err);
+            alert('Failed to upload proof: ' + err.message);
+            this.onProofFileSelected(expenseId);
+        }
+    },
+
+    // ==========================================
+    // 10. REJECTED EXPENSES PAGE
+    // ==========================================
+    async initRejectedExpenses() {
+        console.log('Initializing Rejected Expenses page...');
+        await this.initHeader();
+        this.loadRejectedExpenses();
+    },
+
+    async loadRejectedExpenses() {
+        const container = document.getElementById('rejectedExpensesContainer');
+        if (!container) return;
+
+        console.log('Loading Rejected Expenses...');
+        try {
+            const list = await API.get('/api/expenses/rejected');
+            console.log('Rejected Expenses Response:', list);
+            if (!list || list.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-5 text-secondary">
+                        <i class="fa-solid fa-circle-check fs-1 mb-3 opacity-50" style="color: var(--accent-emerald);"></i>
+                        <p class="fs-5 fw-semibold text-white mb-2">No rejected expenses.</p>
+                        <p class="mb-0 text-secondary">All your paid expenses are currently approved or verified!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            list.forEach(exp => {
+                const date = new Date(exp.expenseDate).toLocaleDateString();
+                const badgeClass = exp.verificationStatus === 'REJECTED' ? 'bg-danger' : 'bg-warning text-dark';
+                
+                let approvalsInfo = '';
+                if (exp.approvals && exp.approvals.length > 0) {
+                    const items = exp.approvals.map(a => {
+                        let symbol = '⏳';
+                        if (a.status === 'APPROVED') symbol = '✔';
+                        else if (a.status === 'REJECTED') symbol = '❌';
+                        else if (a.status === 'REQUESTED_PROOF') symbol = '📷';
+                        const commentStr = a.comment ? ` (${a.comment})` : '';
+                        return `${a.userName}: ${a.status}${symbol}${commentStr}`;
+                    }).join(', ');
+                    approvalsInfo = `<div class="mt-2 text-secondary small"><strong>Details:</strong> ${items}</div>`;
+                }
+
+                html += `
+                    <div class="list-item-glass p-4 mb-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h5 class="fw-bold text-white mb-1">${exp.description} <span class="badge ${badgeClass} ms-2">${exp.verificationStatus}</span></h5>
+                                <p class="text-secondary mb-0 small">Paid on ${date} | Category: ${exp.category}</p>
+                                ${approvalsInfo}
+                            </div>
+                            <h4 class="fw-bold text-white mb-0">₹${parseFloat(exp.amount).toFixed(2)}</h4>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        } catch (err) {
+            console.error('Error loading rejected expenses:', err);
+            container.innerHTML = `
+                <div class="text-center py-5 text-danger">
+                    <i class="fa-solid fa-triangle-exclamation fs-2 mb-3"></i>
+                    <p class="mb-0 text-white fw-semibold">Unable to load Rejected Expenses.</p>
+                    <p class="small text-secondary mb-3">Please try again.</p>
+                    <button class="btn btn-sm btn-secondary-outline" onclick="App.loadRejectedExpenses()">Retry</button>
+                </div>
+            `;
+        }
+    },
+
+    // ==========================================
+    // 11. VERIFIED EXPENSES PAGE
+    // ==========================================
+    async initVerifiedExpenses() {
+        console.log('Initializing Verified Expenses page...');
+        await this.initHeader();
+        this.loadVerifiedExpenses();
+    },
+
+    async loadVerifiedExpenses() {
+        const container = document.getElementById('verifiedExpensesContainer');
+        if (!container) return;
+
+        console.log('Loading Verified Expenses...');
+        try {
+            const list = await API.get('/api/expenses/verified');
+            console.log('Verified Expenses Response:', list);
+            if (!list || list.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-5 text-secondary">
+                        <i class="fa-solid fa-circle-check fs-1 mb-3 opacity-50" style="color: var(--accent-emerald);"></i>
+                        <p class="fs-5 fw-semibold text-white mb-2">No verified expenses yet.</p>
+                        <p class="mb-0 text-secondary">Keep splitting expenses to verify them!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            list.forEach(exp => {
+                const date = new Date(exp.expenseDate).toLocaleDateString();
+                html += `
+                    <div class="list-item-glass p-4 mb-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h5 class="fw-bold text-white mb-1">${exp.description} <span class="badge bg-success ms-2">Verified</span></h5>
+                                <p class="text-secondary mb-0 small">Paid on ${date} | Category: ${exp.category}</p>
+                            </div>
+                            <h4 class="fw-bold text-white mb-0">₹${parseFloat(exp.amount).toFixed(2)}</h4>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        } catch (err) {
+            console.error('Error loading verified expenses:', err);
+            container.innerHTML = `
+                <div class="text-center py-5 text-danger">
+                    <i class="fa-solid fa-triangle-exclamation fs-2 mb-3"></i>
+                    <p class="mb-0 text-white fw-semibold">Unable to load Verified Expenses.</p>
+                    <p class="small text-secondary mb-3">Please try again.</p>
+                    <button class="btn btn-sm btn-secondary-outline" onclick="App.loadVerifiedExpenses()">Retry</button>
+                </div>
+            `;
+        }
+    },
+
+    // ==========================================
+    // 12. STANDALONE INVITATIONS PAGE
+    // ==========================================
+    async initInvitations() {
+        console.log('Initializing Invitations page...');
+        await this.initHeader();
+        this.loadInvitationsList();
+    },
+
+    async loadInvitationsList() {
+        const container = document.getElementById('invitationsContainer');
+        if (!container) return;
+
+        console.log('Loading Pending Invitations...');
+        try {
+            const list = await API.get('/api/groups/invitations');
+            console.log('Invitations Response:', list);
+            if (!list || list.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-5 text-secondary">
+                        <i class="fa-solid fa-envelope-open fs-1 mb-3 opacity-50" style="color: var(--accent-indigo);"></i>
+                        <p class="fs-5 fw-semibold text-white mb-2">No pending invitations.</p>
+                        <p class="mb-0 text-secondary">You have no group invitations waiting for your response.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            list.forEach(inv => {
+                const date = new Date(inv.createdAt).toLocaleDateString();
+                html += `
+                    <div class="list-item-glass p-4 mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="fw-bold text-white mb-1">${inv.groupName}</h5>
+                                <p class="text-secondary mb-0 small">Invited by <strong>${inv.senderName}</strong> on ${date}</p>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm text-white px-3" style="background-color: var(--accent-emerald);" onclick="App.respondInvitationStandalone(${inv.id}, 'accept')">
+                                    <i class="fa-solid fa-check me-1"></i>Accept
+                                </button>
+                                <button class="btn btn-sm text-white px-3" style="background-color: var(--accent-rose);" onclick="App.respondInvitationStandalone(${inv.id}, 'reject')">
+                                    <i class="fa-solid fa-xmark me-1"></i>Reject
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        } catch (err) {
+            console.error('Error loading invitations:', err);
+            container.innerHTML = `
+                <div class="text-center py-5 text-danger">
+                    <i class="fa-solid fa-triangle-exclamation fs-2 mb-3"></i>
+                    <p class="mb-0 text-white fw-semibold">Unable to load Invitations.</p>
+                    <p class="small text-secondary mb-3">Please try again.</p>
+                    <button class="btn btn-sm btn-secondary-outline" onclick="App.loadInvitationsList()">Retry</button>
+                </div>
+            `;
+        }
+    },
+
+    async respondInvitationStandalone(id, action) {
+        console.log('Responding to invitation:', id, action);
+        try {
+            await API.post(`/api/groups/invitations/${id}/${action}`, {});
+            this.loadInvitationsList();
+            this.triggerDashboardRefresh();
+        } catch (err) {
+            alert('Failed to respond to invitation: ' + err.message);
+        }
+    },
+
+    // ==========================================
+    // 13. STANDALONE EXPENSE APPROVALS PAGE
+    // ==========================================
+    async initExpenseApprovals() {
+        console.log('Initializing Expense Approvals page...');
+        await this.initHeader();
+        this.loadExpenseApprovalsList();
+    },
+
+    async loadExpenseApprovalsList() {
+        const container = document.getElementById('approvalsContainer');
+        if (!container) return;
+
+        console.log('Loading Pending Expense Approvals...');
+        try {
+            const list = await API.get('/api/expenses/pending-approvals');
+            console.log('Pending Approvals Response:', list);
+            if (!list || list.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-5 text-secondary">
+                        <i class="fa-solid fa-stamp fs-1 mb-3 opacity-50" style="color: var(--accent-indigo);"></i>
+                        <p class="fs-5 fw-semibold text-white mb-2">No pending approvals.</p>
+                        <p class="mb-0 text-secondary">All expenses are up to date!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            list.forEach(appr => {
+                const statusText = appr.status === 'SUBMITTED' ? ' <span class="badge bg-info ms-2">Proof Submitted</span>' : '';
+                html += `
+                    <div class="list-item-glass p-4 mb-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <span class="text-white fw-semibold">${appr.userName}${statusText}</span>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-success text-white" onclick="App.respondExpenseApprovalStandalone(${appr.id}, 'APPROVED')">
+                                <i class="fa-solid fa-check me-1"></i>Approve
+                            </button>
+                            <button class="btn btn-sm btn-danger text-white" onclick="App.respondExpenseApprovalPromptStandalone(${appr.id}, 'REJECTED')">
+                                <i class="fa-solid fa-xmark me-1"></i>Reject
+                            </button>
+                            <button class="btn btn-sm btn-warning text-white" onclick="App.respondExpenseApprovalStandalone(${appr.id}, 'REQUESTED_PROOF')">
+                                <i class="fa-solid fa-camera me-1"></i>Request Proof
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        } catch (err) {
+            console.error('Error loading expense approvals:', err);
+            container.innerHTML = `
+                <div class="text-center py-5 text-danger">
+                    <i class="fa-solid fa-triangle-exclamation fs-2 mb-3"></i>
+                    <p class="mb-0 text-white fw-semibold">Unable to load Expense Approvals.</p>
+                    <p class="small text-secondary mb-3">Please try again.</p>
+                    <button class="btn btn-sm btn-secondary-outline" onclick="App.loadExpenseApprovalsList()">Retry</button>
+                </div>
+            `;
+        }
+    },
+
+    async respondExpenseApprovalStandalone(id, status, comment = '') {
+        console.log('Responding to expense approval:', id, status);
+        try {
+            await API.post(`/api/expenses/${id}/approval`, { status, comment });
+            this.loadExpenseApprovalsList();
+            this.triggerDashboardRefresh();
+        } catch (err) {
+            alert('Failed to submit approval: ' + err.message);
+        }
+    },
+
+    respondExpenseApprovalPromptStandalone(id, status) {
+        const reason = prompt('Please enter rejection reason:');
+        if (reason !== null) {
+            this.respondExpenseApprovalStandalone(id, status, reason);
+        }
     }
 };

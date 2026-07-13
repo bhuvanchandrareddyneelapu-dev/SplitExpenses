@@ -8,6 +8,8 @@ import com.splitwisemoney.repository.GroupMemberRepository;
 import com.splitwisemoney.repository.GroupRepository;
 import com.splitwisemoney.repository.GroupInvitationRepository;
 import com.splitwisemoney.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +20,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class GroupService {
+
+
 
     private final GroupRepository groupRepository;
     private final GroupMemberRepository groupMemberRepository;
@@ -133,9 +137,15 @@ public class GroupService {
         notificationService.createNotification(userToRemove, "GROUP_INVITE", "You were removed from the group " + group.getGroupName());
     }
 
+    /**
+     * Returns all groups for the given user with their createdBy eagerly loaded,
+     * preventing LazyInitializationException when the controller maps the response
+     * outside this transaction boundary.
+     */
     @Transactional(readOnly = true)
     public List<Group> getUserGroups(Long userId) {
-        List<GroupMember> memberships = groupMemberRepository.findByUserId(userId);
+        // Use the JOIN FETCH query so group.createdBy is loaded within this transaction
+        List<GroupMember> memberships = groupMemberRepository.findByUserIdWithGroupAndCreator(userId);
         return memberships.stream()
                 .map(GroupMember::getGroup)
                 .collect(Collectors.toList());

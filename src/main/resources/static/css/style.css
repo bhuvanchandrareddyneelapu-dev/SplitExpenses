@@ -292,3 +292,16 @@ select.form-glass option {
     font-weight: 700;
     transform: translate(50%, -30%);
 }
+
+/* Clickable cards hover styling */
+.clickable-card {
+    cursor: pointer;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease !important;
+}
+
+.clickable-card:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 10px 25px rgba(99, 102, 241, 0.15) !important;
+    border-color: rgba(99, 102, 241, 0.3) !important;
+}
+

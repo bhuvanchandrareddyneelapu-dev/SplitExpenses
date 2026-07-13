@@ -24,4 +24,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     BigDecimal sumAmountByPaidById(@Param("userId") Long userId);
 
     long countByPaidByIdAndVerificationStatus(Long paidById, String verificationStatus);
+    List<Expense> findByPaidByIdAndVerificationStatusIn(Long paidById, List<String> statuses);
+    List<Expense> findByPaidByIdAndVerificationStatus(Long paidById, String verificationStatus);
 }

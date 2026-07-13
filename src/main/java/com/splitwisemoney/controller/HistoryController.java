@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/history")
+@RequestMapping({"/api/history", "/api/activity"})
 @SecurityRequirement(name = "bearerAuth")
 @Tag(name = "History", description = "Endpoints for user activity logs history")
 public class HistoryController {

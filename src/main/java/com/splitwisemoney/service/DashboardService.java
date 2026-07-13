@@ -39,6 +39,11 @@ public class DashboardService {
         this.expenseApprovalRepository = expenseApprovalRepository;
     }
 
+    /** Returns value if non-null, otherwise BigDecimal.ZERO. Guards against JPQL aggregate nulls. */
+    private static BigDecimal coalesce(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
+
     @Transactional(readOnly = true)
     public DashboardData getDashboardData(User user) {
         Long userId = user.getId();
@@ -48,7 +53,8 @@ public class DashboardService {
         int totalGroups = memberships.size();
 
         // 2. Compute Total Paid (sum of all expenses paid by the user)
-        BigDecimal totalPaid = expenseRepository.sumAmountByPaidById(userId).setScale(2, RoundingMode.HALF_UP);
+        //    JPQL SUM returns null when no rows match; coalesce guards against NPE.
+        BigDecimal totalPaid = coalesce(expenseRepository.sumAmountByPaidById(userId)).setScale(2, RoundingMode.HALF_UP);
 
         // 3. Compute current Net Owed and Net Receive across all groups
         BigDecimal totalOwed = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
@@ -57,10 +63,10 @@ public class DashboardService {
         for (GroupMember membership : memberships) {
             Long groupId = membership.getGroup().getId();
 
-            BigDecimal groupPaid = expenseRepository.sumAmountByGroupIdAndPaidById(groupId, userId);
-            BigDecimal groupOwedShare = expenseParticipantRepository.sumShareAmountByGroupIdAndUserId(groupId, userId);
-            BigDecimal settledFrom = settlementRepository.sumSettledAmountByGroupIdAndFromUserId(groupId, userId);
-            BigDecimal settledTo = settlementRepository.sumSettledAmountByGroupIdAndToUserId(groupId, userId);
+            BigDecimal groupPaid      = coalesce(expenseRepository.sumAmountByGroupIdAndPaidById(groupId, userId));
+            BigDecimal groupOwedShare = coalesce(expenseParticipantRepository.sumShareAmountByGroupIdAndUserId(groupId, userId));
+            BigDecimal settledFrom    = coalesce(settlementRepository.sumSettledAmountByGroupIdAndFromUserId(groupId, userId));
+            BigDecimal settledTo      = coalesce(settlementRepository.sumSettledAmountByGroupIdAndToUserId(groupId, userId));
 
             BigDecimal groupBalance = groupPaid.subtract(groupOwedShare)
                     .add(settledFrom)
@@ -79,7 +85,7 @@ public class DashboardService {
         List<ActivityLog> recentActivities = activityLogRepository.findByUserId(userId, topFive).getContent();
 
         int pendingInvitations = groupInvitationRepository.findByReceiverIdAndStatus(userId, "PENDING").size();
-        int pendingApprovals = expenseApprovalRepository.findByUserIdAndStatus(userId, "PENDING").size();
+        int pendingApprovals = expenseApprovalRepository.findByUserIdAndStatusIn(userId, List.of("PENDING", "SUBMITTED")).size();
         int rejectedExpenses = (int) expenseRepository.countByPaidByIdAndVerificationStatus(userId, "UNDER_REVIEW")
                 + (int) expenseRepository.countByPaidByIdAndVerificationStatus(userId, "REJECTED");
         int verifiedExpenses = (int) expenseRepository.countByPaidByIdAndVerificationStatus(userId, "VERIFIED");

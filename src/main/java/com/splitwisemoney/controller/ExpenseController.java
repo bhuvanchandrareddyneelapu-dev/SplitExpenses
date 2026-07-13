@@ -221,4 +221,47 @@ public class ExpenseController {
 
         return ResponseEntity.ok("Receipt uploaded successfully");
     }
+
+    @GetMapping("/pending-proof-requests")
+    @Operation(summary = "List all pending proof requests for current user (where current user is the payer and someone requested proof)")
+    public ResponseEntity<List<ProofRequestDto>> getMyPendingProofRequests() {
+        User user = getAuthenticatedUser();
+        List<com.splitwisemoney.entity.ExpenseApproval> approvals = expenseService.getPendingProofRequestsForUser(user.getId());
+        List<ProofRequestDto> response = approvals.stream()
+                .map(a -> new ProofRequestDto(
+                        a.getId(),
+                        a.getExpense().getId(),
+                        a.getExpense().getDescription(),
+                        a.getUser().getFullName(),
+                        a.getExpense().getPaidBy().getFullName(),
+                        a.getExpense().getAmount(),
+                        a.getExpense().getExpenseDate(),
+                        a.getStatus(),
+                        a.getComment()
+                ))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/rejected")
+    @Operation(summary = "List all rejected or under review expenses paid by current user")
+    public ResponseEntity<List<ExpenseResponse>> getMyRejectedExpenses() {
+        User user = getAuthenticatedUser();
+        List<Expense> expenses = expenseService.getRejectedExpensesForUser(user.getId());
+        List<ExpenseResponse> response = expenses.stream()
+                .map(this::mapToExpenseResponse)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/verified")
+    @Operation(summary = "List all verified expenses paid by current user")
+    public ResponseEntity<List<ExpenseResponse>> getMyVerifiedExpenses() {
+        User user = getAuthenticatedUser();
+        List<Expense> expenses = expenseService.getVerifiedExpensesForUser(user.getId());
+        List<ExpenseResponse> response = expenses.stream()
+                .map(this::mapToExpenseResponse)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(response);
+    }
 }

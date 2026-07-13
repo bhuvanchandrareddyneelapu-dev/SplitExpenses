@@ -215,7 +215,22 @@ public class ExpenseService {
 
     @Transactional(readOnly = true)
     public List<ExpenseApproval> getPendingApprovalsForUser(Long userId) {
-        return expenseApprovalRepository.findByUserIdAndStatus(userId, "PENDING");
+        return expenseApprovalRepository.findByUserIdAndStatusIn(userId, List.of("PENDING", "SUBMITTED"));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ExpenseApproval> getPendingProofRequestsForUser(Long userId) {
+        return expenseApprovalRepository.findByExpensePaidByIdAndStatus(userId, "REQUESTED_PROOF");
+    }
+
+    @Transactional(readOnly = true)
+    public List<Expense> getRejectedExpensesForUser(Long userId) {
+        return expenseRepository.findByPaidByIdAndVerificationStatusIn(userId, List.of("UNDER_REVIEW", "REJECTED"));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Expense> getVerifiedExpensesForUser(Long userId) {
+        return expenseRepository.findByPaidByIdAndVerificationStatus(userId, "VERIFIED");
     }
 
     @Transactional(readOnly = true)
@@ -281,5 +296,16 @@ public class ExpenseService {
         expense.setReceiptUrl(receiptUrl);
         expenseRepository.save(expense);
         activityLogService.log(actor, actor.getFullName() + " uploaded receipt proof for expense \"" + expense.getDescription() + "\"");
+
+        // Update REQUESTED_PROOF approvals to SUBMITTED and notify requesters
+        List<ExpenseApproval> approvals = expenseApprovalRepository.findByExpenseId(expenseId);
+        for (ExpenseApproval approval : approvals) {
+            if ("REQUESTED_PROOF".equalsIgnoreCase(approval.getStatus())) {
+                approval.setStatus("SUBMITTED");
+                expenseApprovalRepository.save(approval);
+                notificationService.createNotification(approval.getUser(), "PROOF_SUBMITTED",
+                        actor.getFullName() + " uploaded receipt proof for expense \"" + expense.getDescription() + "\". Please review/approve.");
+            }
+        }
     }
 }

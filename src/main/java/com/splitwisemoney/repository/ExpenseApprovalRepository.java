@@ -12,5 +12,7 @@ public interface ExpenseApprovalRepository extends JpaRepository<ExpenseApproval
     List<ExpenseApproval> findByExpenseId(Long expenseId);
     Optional<ExpenseApproval> findByExpenseIdAndUserId(Long expenseId, Long userId);
     List<ExpenseApproval> findByUserIdAndStatus(Long userId, String status);
+    List<ExpenseApproval> findByUserIdAndStatusIn(Long userId, List<String> statuses);
     long countByExpensePaidByIdAndStatus(Long paidById, String status);
+    List<ExpenseApproval> findByExpensePaidByIdAndStatus(Long paidById, String status);
 }

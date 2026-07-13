@@ -102,7 +102,7 @@
             </div>
 
             <div class="col-sm-6 col-lg-3">
-                <div class="glass-card p-4 card-metric groups">
+                <div class="glass-card p-4 card-metric groups clickable-card" onclick="window.location.href='groups.html'">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <span class="text-secondary fw-semibold">Total Groups</span>
                         <i class="fa-solid fa-users text-cyan fs-4"></i>
@@ -116,7 +116,7 @@
         <!-- Trust Verification Metrics Grid -->
         <div class="row g-4 mb-5">
             <div class="col-sm-6 col-lg-2">
-                <div class="glass-card p-3 card-metric">
+                <div class="glass-card p-3 card-metric clickable-card" onclick="window.location.href='invitations.html'">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <span class="text-secondary small fw-semibold">Pending Invites</span>
                         <i class="fa-solid fa-envelope text-warning fs-5"></i>
@@ -126,7 +126,7 @@
             </div>
             
             <div class="col-sm-6 col-lg-3">
-                <div class="glass-card p-3 card-metric">
+                <div class="glass-card p-3 card-metric clickable-card" onclick="window.location.href='expense-approvals.html'">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <span class="text-secondary small fw-semibold">Pending Approvals</span>
                         <i class="fa-solid fa-stamp text-info fs-5"></i>
@@ -136,7 +136,7 @@
             </div>
 
             <div class="col-sm-6 col-lg-2">
-                <div class="glass-card p-3 card-metric">
+                <div class="glass-card p-3 card-metric clickable-card" onclick="window.location.href='rejected-expenses.html'">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <span class="text-secondary small fw-semibold">Rejected / Review</span>
                         <i class="fa-solid fa-circle-xmark text-danger fs-5"></i>
@@ -146,7 +146,7 @@
             </div>
 
             <div class="col-sm-6 col-lg-2">
-                <div class="glass-card p-3 card-metric">
+                <div class="glass-card p-3 card-metric clickable-card" onclick="window.location.href='verified-expenses.html'">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <span class="text-secondary small fw-semibold">Verified Expenses</span>
                         <i class="fa-solid fa-circle-check text-success fs-5"></i>
@@ -156,7 +156,7 @@
             </div>
 
             <div class="col-sm-6 col-lg-3">
-                <div class="glass-card p-3 card-metric">
+                <div class="glass-card p-3 card-metric clickable-card" onclick="window.location.href='proof-requests.html'">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <span class="text-secondary small fw-semibold">Pending Proof Requests</span>
                         <i class="fa-solid fa-image text-indigo fs-5"></i>
@@ -170,7 +170,9 @@
             <!-- Recent Activities -->
             <div class="col-lg-7">
                 <div class="glass-card p-4 h-100">
-                    <h4 class="fw-bold mb-4"><i class="fa-solid fa-history me-2 text-indigo"></i>Recent Activities</h4>
+                    <h4 class="fw-bold mb-4 clickable-card d-inline-block p-1 rounded" onclick="window.location.href='history.html'">
+                        <i class="fa-solid fa-history me-2 text-indigo"></i>Recent Activities
+                    </h4>
                     <div id="recentActivityList">
                         <!-- Activity items loaded dynamically -->
                         <div class="text-center py-5 text-secondary">
@@ -185,7 +187,9 @@
             <div class="col-lg-5">
                 <div class="glass-card p-4 h-100">
                     <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h4 class="fw-bold mb-0"><i class="fa-solid fa-users me-2 text-indigo"></i>Quick Groups</h4>
+                        <h4 class="fw-bold mb-0 clickable-card d-inline-block p-1 rounded" onclick="window.location.href='groups.html'">
+                            <i class="fa-solid fa-users me-2 text-indigo"></i>Quick Groups
+                        </h4>
                         <a href="groups.html" class="btn btn-secondary-outline btn-sm">View All</a>
                     </div>
                     <div id="quickGroupList">

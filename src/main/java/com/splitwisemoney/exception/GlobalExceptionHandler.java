@@ -1,9 +1,12 @@
 package com.splitwisemoney.exception;
 
+import org.hibernate.LazyInitializationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -18,53 +21,95 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    // ──────────────────────────────────────────
+    // 400 Bad Request
+    // ──────────────────────────────────────────
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Object> handleIllegalArgumentException(IllegalArgumentException ex, WebRequest request) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", LocalDateTime.now());
-        body.put("status", HttpStatus.BAD_REQUEST.value());
-        body.put("error", "Bad Request");
-        body.put("message", ex.getMessage());
-        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(UsernameNotFoundException.class)
-    public ResponseEntity<Object> handleUsernameNotFoundException(UsernameNotFoundException ex, WebRequest request) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", LocalDateTime.now());
-        body.put("status", HttpStatus.NOT_FOUND.value());
-        body.put("error", "Not Found");
-        body.put("message", ex.getMessage());
-        return new ResponseEntity<>(body, HttpStatus.NOT_FOUND);
+        log.warn("Bad request [{}]: {}", request.getDescription(false), ex.getMessage());
+        return errorBody(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage());
     }
 
     @ExceptionHandler(org.springframework.web.bind.MethodArgumentNotValidException.class)
-    public ResponseEntity<Object> handleValidationException(org.springframework.web.bind.MethodArgumentNotValidException ex, WebRequest request) {
+    public ResponseEntity<Object> handleValidationException(
+            org.springframework.web.bind.MethodArgumentNotValidException ex, WebRequest request) {
+
+        Map<String, String> fieldErrors = new java.util.LinkedHashMap<>();
+        ex.getBindingResult().getFieldErrors()
+          .forEach(e -> fieldErrors.put(e.getField(), e.getDefaultMessage()));
+
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", LocalDateTime.now());
         body.put("status", HttpStatus.BAD_REQUEST.value());
         body.put("error", "Validation Failed");
-
-        Map<String, String> errors = new java.util.HashMap<>();
-        ex.getBindingResult().getFieldErrors().forEach(error ->
-            errors.put(error.getField(), error.getDefaultMessage())
-        );
-        body.put("errors", errors);
         body.put("message", "Validation failed for one or more fields");
-
+        body.put("errors", fieldErrors);
         return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
+    }
+
+    // ──────────────────────────────────────────
+    // 401 Unauthorized
+    // ──────────────────────────────────────────
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<Object> handleAuthenticationException(AuthenticationException ex, WebRequest request) {
+        log.warn("Authentication failed [{}]: {}", request.getDescription(false), ex.getMessage());
+        return errorBody(HttpStatus.UNAUTHORIZED, "Unauthorized", "Authentication required. Please log in again.");
+    }
+
+    @ExceptionHandler(UsernameNotFoundException.class)
+    public ResponseEntity<Object> handleUsernameNotFoundException(UsernameNotFoundException ex, WebRequest request) {
+        log.warn("User not found [{}]: {}", request.getDescription(false), ex.getMessage());
+        return errorBody(HttpStatus.UNAUTHORIZED, "Unauthorized", "Authentication required. Please log in again.");
+    }
+
+    // ──────────────────────────────────────────
+    // 403 Forbidden
+    // ──────────────────────────────────────────
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Object> handleAccessDeniedException(AccessDeniedException ex, WebRequest request) {
+        log.warn("Access denied [{}]: {}", request.getDescription(false), ex.getMessage());
+        return errorBody(HttpStatus.FORBIDDEN, "Forbidden", "You do not have permission to perform this action.");
+    }
+
+    // ──────────────────────────────────────────
+    // 500 Internal Server Error
+    // ──────────────────────────────────────────
+
+    /**
+     * LazyInitializationException means a JPA entity's lazy-loaded association was
+     * accessed outside a transaction. This is a programming error; log it in detail
+     * so it can be fixed, but return a safe 500 to the client.
+     */
+    @ExceptionHandler(LazyInitializationException.class)
+    public ResponseEntity<Object> handleLazyInitializationException(LazyInitializationException ex, WebRequest request) {
+        log.error("LazyInitializationException on [{}] — a lazy-loaded association was accessed outside its " +
+                  "transaction. Ensure the service method loads all required associations before the transaction closes. " +
+                  "Detail: {}", request.getDescription(false), ex.getMessage(), ex);
+        return errorBody(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
+                "An unexpected error occurred. Please try again later.");
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleGlobalException(Exception ex, WebRequest request) {
         // Log full details server-side; never expose internals to the client
         log.error("Unhandled exception on request [{}]: {}", request.getDescription(false), ex.getMessage(), ex);
+        return errorBody(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
+                "An unexpected error occurred. Please try again later.");
+    }
 
+    // ──────────────────────────────────────────
+    // Helpers
+    // ──────────────────────────────────────────
+
+    private ResponseEntity<Object> errorBody(HttpStatus status, String error, String message) {
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", LocalDateTime.now());
-        body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
-        body.put("error", "Internal Server Error");
-        body.put("message", "An unexpected error occurred. Please try again later.");
-        return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
+        body.put("status", status.value());
+        body.put("error", error);
+        body.put("message", message);
+        return new ResponseEntity<>(body, status);
     }
 }
