@@ -2,13 +2,13 @@
 const App = {
     // Shared state variables
     currentUser: null,
-    
+
     // Page router helper
     checkAuth() {
         const token = API.getToken();
         const currentPath = window.location.pathname;
         const isPublicPage = currentPath.endsWith('index.html') || currentPath.endsWith('/') || currentPath.endsWith('login.html') || currentPath.endsWith('register.html');
-        
+
         if (!token && !isPublicPage) {
             window.location.href = 'login.html';
         }
@@ -34,10 +34,10 @@ const App = {
             // Load user profile for display
             const profile = await API.get('/api/users/me');
             this.currentUser = profile;
-            
+
             const headerUserName = document.getElementById('headerUserName');
             if (headerUserName) headerUserName.textContent = profile.fullName;
-            
+
             const welcomeUserName = document.getElementById('welcomeUserName');
             if (welcomeUserName) welcomeUserName.textContent = profile.fullName;
 
@@ -69,7 +69,6 @@ const App = {
     // 1. DASHBOARD PAGE
     // ==========================================
     async initDashboard() {
-        console.log('Initializing Dashboard...');
         await this.initHeader();
         this.loadDashboardData();
         this.loadQuickGroups();
@@ -77,17 +76,15 @@ const App = {
 
     async loadDashboardData() {
         const activityList = document.getElementById('recentActivityList');
-        console.log('Loading Dashboard Summary...');
         try {
             const dashboardData = await API.get('/api/dashboard');
-            console.log('Dashboard Summary Response:', dashboardData);
-            
+
             // Set stats
             const setStat = (id, val) => {
                 const el = document.getElementById(id);
                 if (el) el.textContent = val;
             };
-            
+
             setStat('statTotalPaid', `₹${parseFloat(dashboardData.totalPaid || 0).toFixed(2)}`);
             setStat('statTotalOwed', `₹${parseFloat(dashboardData.totalOwed || 0).toFixed(2)}`);
             setStat('statTotalReceive', `₹${parseFloat(dashboardData.amountToReceive || 0).toFixed(2)}`);
@@ -101,16 +98,14 @@ const App = {
             // Render activities
             if (activityList) {
                 if (!dashboardData.recentActivities || dashboardData.recentActivities.length === 0) {
-                    console.log('Recent Activities: empty');
                     activityList.innerHTML = `
                         <div class="text-center py-5 text-secondary">
                             <i class="fa-solid fa-history fs-2 mb-3 opacity-50"></i>
                             <p class="mb-0">No recent activities yet.</p>
-                            <p class="small text-secondary">Start by creating your first expense.</p>
+                            <p class="small text-secondary">Create your first group to get started.</p>
                         </div>
                     `;
                 } else {
-                    console.log('Recent Activities loaded:', dashboardData.recentActivities.length, 'items');
                     let html = '<div class="timeline-log">';
                     dashboardData.recentActivities.forEach(act => {
                         const date = new Date(act.createdAt).toLocaleString();
@@ -128,12 +123,12 @@ const App = {
                 }
             }
         } catch (err) {
-            console.error('Error loading dashboard data:', err);
+            console.error('Failed to load dashboard data', err);
             if (activityList) {
                 activityList.innerHTML = `
                     <div class="text-center py-5 text-danger">
                         <i class="fa-solid fa-triangle-exclamation fs-2 mb-3"></i>
-                        <p class="mb-0 text-white fw-semibold">Unable to load Recent Activities.</p>
+                        <p class="mb-0 text-white fw-semibold">Unable to load data.</p>
                         <p class="small text-secondary mb-3">Please try again.</p>
                         <button class="btn btn-sm btn-secondary-outline" onclick="App.loadDashboardData()">Retry</button>
                     </div>
@@ -144,16 +139,14 @@ const App = {
 
     async loadQuickGroups() {
         const quickGroupList = document.getElementById('quickGroupList');
-        console.log('Loading Quick Groups...');
         try {
             const groups = await API.get('/api/groups');
-            console.log('Quick Groups loaded:', groups ? groups.length : 0, 'groups');
             if (quickGroupList) {
                 if (!groups || groups.length === 0) {
                     quickGroupList.innerHTML = `
                         <div class="text-center py-5 text-secondary">
                             <i class="fa-solid fa-users-slash fs-2 mb-3 opacity-50"></i>
-                            <p class="mb-0">No groups yet.</p>
+                            <p class="mb-0">You haven't joined any groups yet.</p>
                             <p class="small text-secondary mb-3">Create your first group.</p>
                             <a href="groups.html" class="btn btn-primary-glow btn-sm"><i class="fa-solid fa-plus me-1"></i>Create Group</a>
                         </div>
@@ -174,32 +167,18 @@ const App = {
                 }
             }
         } catch (err) {
-            console.error('Error loading groups:', err);
+            console.error('Failed to load quick groups', err);
             if (quickGroupList) {
                 quickGroupList.innerHTML = `
                     <div class="text-center py-5 text-danger">
                         <i class="fa-solid fa-triangle-exclamation fs-2 mb-3"></i>
-                        <p class="mb-0 text-white fw-semibold">Unable to load Quick Groups.</p>
+                        <p class="mb-0 text-white fw-semibold">Unable to load data.</p>
                         <p class="small text-secondary mb-3">Please try again.</p>
                         <button class="btn btn-sm btn-secondary-outline" onclick="App.loadQuickGroups()">Retry</button>
                     </div>
                 `;
             }
         }
-    },
-
-    /**
-     * Refreshes dashboard counters and activity list.
-     * Safe to call from any page — silently no-ops if dashboard elements are absent.
-     */
-    triggerDashboardRefresh() {
-        console.log('Dashboard refresh triggered');
-        // Only reload dashboard data if we are on the dashboard page
-        if (document.getElementById('recentActivityList') || document.getElementById('quickGroupList')) {
-            this.loadDashboardData();
-            this.loadQuickGroups();
-        }
-        this.loadUnreadNotificationCount();
     },
 
     // ==========================================
@@ -216,20 +195,20 @@ const App = {
                 e.preventDefault();
                 const groupName = document.getElementById('groupName').value;
                 const modalAlertArea = document.getElementById('modalAlertArea');
-                
+
                 modalAlertArea.classList.add('d-none');
-                
+
                 try {
                     await API.post('/api/groups', { groupName });
-                    
+
                     // Hide Modal
                     const modalEl = document.getElementById('createGroupModal');
                     const modal = bootstrap.Modal.getInstance(modalEl);
                     modal.hide();
-                    
+
                     // Reset form
                     createGroupForm.reset();
-                    
+
                     // Reload groups
                     this.loadGroupsList();
                 } catch (err) {
@@ -291,7 +270,7 @@ const App = {
 
     async initGroupDetails() {
         await this.initHeader();
-        
+
         const urlParams = new URLSearchParams(window.location.search);
         const groupId = urlParams.get('id');
         if (!groupId) {
@@ -355,20 +334,20 @@ const App = {
                 e.preventDefault();
                 const email = document.getElementById('newMemberEmail').value;
                 const alertArea = document.getElementById('groupAlertArea');
-                
+
                 alertArea.classList.add('d-none');
-                
+
                 try {
                     await API.post(`/api/groups/${groupId}/invite`, { email });
                     document.getElementById('newMemberEmail').value = '';
-                    
+
                     alertArea.textContent = 'Invitation sent successfully!';
                     alertArea.className = 'alert border-0 text-white d-block';
                     alertArea.style.backgroundColor = 'var(--accent-emerald)';
-                    
+
                     this.loadGroupMembers(groupId);
                     this.loadGroupSettlements(groupId);
-                    
+
                     setTimeout(() => alertArea.classList.add('d-none'), 3000);
                 } catch (err) {
                     alertArea.textContent = err.message || 'Failed to add member.';
@@ -454,9 +433,9 @@ const App = {
                 url += `&category=${encodeURIComponent(category)}`;
             }
             const pageData = await API.get(url);
-            
+
             this.groupExpensesTotalPages = pageData.totalPages;
-            
+
             // Update pagination UI
             document.getElementById('expensePaginationText').textContent = `Page ${this.groupExpensesPage + 1} of ${pageData.totalPages || 1}`;
             document.getElementById('btnPrevPage').disabled = this.groupExpensesPage === 0;
@@ -471,7 +450,7 @@ const App = {
             pageData.content.forEach(exp => {
                 const date = new Date(exp.expenseDate).toLocaleDateString();
                 const badgeClass = `badge-${exp.category.toLowerCase()}`;
-                
+
                 // Construct participants breakdown
                 const partsHtml = exp.participants.map(p => `${p.fullName} (₹${parseFloat(p.shareAmount).toFixed(2)})`).join(', ');
 
@@ -604,7 +583,7 @@ const App = {
     async loadGroupSettlements(groupId) {
         const consoleEl = document.getElementById('simplifiedSettlementConsole');
         const historyEl = document.getElementById('settlementHistoryList');
-        
+
         try {
             // Load Simplified Settlements
             const simplified = await API.get(`/api/settlements/group/${groupId}/owed`);
@@ -620,7 +599,7 @@ const App = {
                 simplified.forEach((s, idx) => {
                     const isSenderMe = this.currentUser && this.currentUser.id === s.fromUserId;
                     const isReceiverMe = this.currentUser && this.currentUser.id === s.toUserId;
-                    
+
                     html += `
                         <div class="list-group-item list-item-glass d-flex justify-content-between align-items-center mb-2">
                             <div>
@@ -676,10 +655,10 @@ const App = {
                     amount,
                     status: 'SETTLED'
                 });
-                
+
                 // Refresh list
                 this.loadGroupSettlements(groupId);
-                
+
                 // Trigger global badge update
                 this.loadUnreadNotificationCount();
                 this.triggerDashboardRefresh();
@@ -693,7 +672,7 @@ const App = {
     // 4. ADD / EDIT EXPENSE PAGE
     // ==========================================
     groupMembersCache: [],
-    
+
     async initAddExpense() {
         await this.initHeader();
 
@@ -708,7 +687,7 @@ const App = {
 
         document.getElementById('btnBackToGroup').href = `group-details.html?id=${groupId}`;
         document.getElementById('btnCancelExpense').href = `group-details.html?id=${groupId}`;
-        
+
         // Setup Date picker to today by default
         document.getElementById('expenseDate').valueAsDate = new Date();
 
@@ -745,7 +724,7 @@ const App = {
             if (expenseId) {
                 document.getElementById('expenseFormTitle').textContent = 'Edit Expense';
                 document.getElementById('btnSubmitExpense').textContent = 'Update Expense';
-                
+
                 const exp = await API.get(`/api/expenses/${expenseId}`);
                 document.getElementById('amount').value = exp.amount;
                 document.getElementById('description').value = exp.description;
@@ -759,7 +738,7 @@ const App = {
                 const participantCount = exp.participants.length;
                 let isEquallySplit = true;
                 const expectedEqually = (exp.amount / participantCount).toFixed(2);
-                
+
                 exp.participants.forEach(p => {
                     if (Math.abs(p.shareAmount - expectedEqually) > 0.05) {
                         isEquallySplit = false;
@@ -771,7 +750,7 @@ const App = {
                 } else {
                     document.getElementById('splitCustom').checked = true;
                 }
-                
+
                 this.renderSplitUI();
 
                 // Check correct users in checkboxes, fill inputs
@@ -938,7 +917,7 @@ const App = {
         const method = document.querySelector('input[name="splitMethod"]:checked').value;
         const tbody = document.getElementById('participantsSplitTableBody');
         const sumDiv = document.getElementById('splitSummaryText');
-        
+
         let headerText = 'Share Amount';
         if (method === 'PERCENT') {
             headerText = 'Share (%)';
@@ -1072,9 +1051,9 @@ const App = {
         const container = document.getElementById('historyLogsContainer');
         try {
             const pageData = await API.get(`/api/history?page=${this.historyPage}&size=10&sort=createdAt,desc`);
-            
+
             this.historyTotalPages = pageData.totalPages;
-            
+
             document.getElementById('historyPaginationText').textContent = `Page ${this.historyPage + 1} of ${pageData.totalPages || 1}`;
             document.getElementById('btnPrevHistoryPage').disabled = this.historyPage === 0;
             document.getElementById('btnNextHistoryPage').disabled = this.historyPage >= (pageData.totalPages - 1) || pageData.totalPages === 0;
@@ -1252,9 +1231,9 @@ const App = {
         const container = document.getElementById('notificationsContainer');
         try {
             const pageData = await API.get(`/api/notifications?page=${this.notificationsPage}&size=10&sort=createdAt,desc`);
-            
+
             this.notificationsTotalPages = pageData.totalPages;
-            
+
             document.getElementById('notificationsPaginationText').textContent = `Page ${this.notificationsPage + 1} of ${pageData.totalPages || 1}`;
             document.getElementById('btnPrevNotificationsPage').disabled = this.notificationsPage === 0;
             document.getElementById('btnNextNotificationsPage').disabled = this.notificationsPage >= (pageData.totalPages - 1) || pageData.totalPages === 0;
@@ -1267,7 +1246,7 @@ const App = {
             let html = '';
             pageData.content.forEach(n => {
                 const date = new Date(n.createdAt).toLocaleString();
-                
+
                 // Color glow based on notification status
                 const indicatorClass = n.isRead ? 'bg-secondary' : 'bg-primary-glow';
                 const opacity = n.isRead ? 'opacity: 0.65;' : '';
@@ -1295,7 +1274,7 @@ const App = {
     // ==========================================
     async initProfile() {
         await this.initHeader();
-        
+
         try {
             const profile = await API.get('/api/users/me');
             document.getElementById('profileDisplayName').textContent = profile.fullName;
@@ -1313,12 +1292,12 @@ const App = {
             e.preventDefault();
             const fullName = document.getElementById('profileFullName').value;
             const alertArea = document.getElementById('profileAlertArea');
-            
+
             alertArea.classList.add('d-none');
 
             try {
                 const updated = await API.put('/api/users/me', { fullName });
-                
+
                 document.getElementById('profileDisplayName').textContent = updated.fullName;
                 const headerUserName = document.getElementById('headerUserName');
                 if (headerUserName) headerUserName.textContent = updated.fullName;
@@ -1326,7 +1305,7 @@ const App = {
                 alertArea.textContent = 'Profile updated successfully!';
                 alertArea.className = 'alert border-0 text-white d-block';
                 alertArea.style.backgroundColor = 'var(--accent-emerald)';
-                
+
                 setTimeout(() => alertArea.classList.add('d-none'), 3000);
             } catch (err) {
                 alertArea.textContent = err.message || 'Failed to update profile.';
@@ -1349,7 +1328,7 @@ const App = {
             const oldPassword = document.getElementById('oldPassword').value;
             const newPassword = document.getElementById('newPassword').value;
             const alertArea = document.getElementById('settingsAlertArea');
-            
+
             alertArea.classList.add('d-none');
 
             try {
@@ -1359,7 +1338,7 @@ const App = {
                 alertArea.textContent = 'Password updated successfully!';
                 alertArea.className = 'alert border-0 text-white d-block';
                 alertArea.style.backgroundColor = 'var(--accent-emerald)';
-                
+
                 setTimeout(() => alertArea.classList.add('d-none'), 3000);
             } catch (err) {
                 alertArea.textContent = err.message || 'Failed to update password. Please check your current password.';
@@ -1373,7 +1352,6 @@ const App = {
     // 9. PROOF REQUESTS PAGE
     // ==========================================
     async initProofRequests() {
-        console.log('Initializing Proof Requests page...');
         await this.initHeader();
         this.loadProofRequests();
     },
@@ -1381,12 +1359,10 @@ const App = {
     async loadProofRequests() {
         const container = document.getElementById('proofRequestsContainer');
         if (!container) return;
-        
-        console.log('Loading Pending Proof Requests...');
+
         try {
             const list = await API.get('/api/expenses/pending-proof-requests');
-            console.log('Pending Proof API Response:', list);
-            if (!list || list.length === 0) {
+            if (list.length === 0) {
                 container.innerHTML = `
                     <div class="text-center py-5 text-secondary">
                         <i class="fa-solid fa-image fs-1 mb-3 opacity-50" style="color: var(--accent-indigo);"></i>
@@ -1429,15 +1405,7 @@ const App = {
             });
             container.innerHTML = html;
         } catch (err) {
-            console.error('Error loading proof requests:', err);
-            container.innerHTML = `
-                <div class="text-center py-5 text-danger">
-                    <i class="fa-solid fa-triangle-exclamation fs-2 mb-3"></i>
-                    <p class="mb-0 text-white fw-semibold">Unable to load Proof Requests.</p>
-                    <p class="small text-secondary mb-3">Please try again.</p>
-                    <button class="btn btn-sm btn-secondary-outline" onclick="App.loadProofRequests()">Retry</button>
-                </div>
-            `;
+            container.innerHTML = `<p class="text-danger py-4 text-center">Failed to load proof requests: ${err.message}</p>`;
         }
     },
 
@@ -1446,7 +1414,7 @@ const App = {
         const display = document.getElementById(`fileNameDisplay_${expenseId}`);
         const btnSubmit = document.getElementById(`btnSubmit_${expenseId}`);
         const btnSelect = document.getElementById(`btnSelect_${expenseId}`);
-        
+
         if (fileInput.files.length > 0) {
             const file = fileInput.files[0];
             display.textContent = file.name;
@@ -1462,21 +1430,18 @@ const App = {
     async submitProof(expenseId) {
         const fileInput = document.getElementById(`file_${expenseId}`);
         if (fileInput.files.length === 0) return;
-        
-        console.log('Submitting proof for expense:', expenseId);
+
         try {
             const file = fileInput.files[0];
             const display = document.getElementById(`fileNameDisplay_${expenseId}`);
             display.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin me-1"></i>Uploading...`;
-            
+
             await API.uploadFile(`/api/expenses/${expenseId}/receipt`, file);
-            
-            console.log('Proof uploaded successfully for expense:', expenseId);
+
             alert('Proof uploaded successfully!');
             this.loadProofRequests();
-            this.triggerDashboardRefresh();
+            this.loadUnreadNotificationCount();
         } catch (err) {
-            console.error('Error uploading proof:', err);
             alert('Failed to upload proof: ' + err.message);
             this.onProofFileSelected(expenseId);
         }
@@ -1486,7 +1451,6 @@ const App = {
     // 10. REJECTED EXPENSES PAGE
     // ==========================================
     async initRejectedExpenses() {
-        console.log('Initializing Rejected Expenses page...');
         await this.initHeader();
         this.loadRejectedExpenses();
     },
@@ -1495,15 +1459,13 @@ const App = {
         const container = document.getElementById('rejectedExpensesContainer');
         if (!container) return;
 
-        console.log('Loading Rejected Expenses...');
         try {
             const list = await API.get('/api/expenses/rejected');
-            console.log('Rejected Expenses Response:', list);
-            if (!list || list.length === 0) {
+            if (list.length === 0) {
                 container.innerHTML = `
                     <div class="text-center py-5 text-secondary">
                         <i class="fa-solid fa-circle-check fs-1 mb-3 opacity-50" style="color: var(--accent-emerald);"></i>
-                        <p class="fs-5 fw-semibold text-white mb-2">No rejected expenses.</p>
+                        <p class="fs-5 fw-semibold text-white mb-2">No pending rejected expenses.</p>
                         <p class="mb-0 text-secondary">All your paid expenses are currently approved or verified!</p>
                     </div>
                 `;
@@ -1514,7 +1476,7 @@ const App = {
             list.forEach(exp => {
                 const date = new Date(exp.expenseDate).toLocaleDateString();
                 const badgeClass = exp.verificationStatus === 'REJECTED' ? 'bg-danger' : 'bg-warning text-dark';
-                
+
                 let approvalsInfo = '';
                 if (exp.approvals && exp.approvals.length > 0) {
                     const items = exp.approvals.map(a => {
@@ -1543,15 +1505,7 @@ const App = {
             });
             container.innerHTML = html;
         } catch (err) {
-            console.error('Error loading rejected expenses:', err);
-            container.innerHTML = `
-                <div class="text-center py-5 text-danger">
-                    <i class="fa-solid fa-triangle-exclamation fs-2 mb-3"></i>
-                    <p class="mb-0 text-white fw-semibold">Unable to load Rejected Expenses.</p>
-                    <p class="small text-secondary mb-3">Please try again.</p>
-                    <button class="btn btn-sm btn-secondary-outline" onclick="App.loadRejectedExpenses()">Retry</button>
-                </div>
-            `;
+            container.innerHTML = `<p class="text-danger py-4 text-center">Failed to load rejected expenses: ${err.message}</p>`;
         }
     },
 
@@ -1559,7 +1513,6 @@ const App = {
     // 11. VERIFIED EXPENSES PAGE
     // ==========================================
     async initVerifiedExpenses() {
-        console.log('Initializing Verified Expenses page...');
         await this.initHeader();
         this.loadVerifiedExpenses();
     },
@@ -1568,11 +1521,9 @@ const App = {
         const container = document.getElementById('verifiedExpensesContainer');
         if (!container) return;
 
-        console.log('Loading Verified Expenses...');
         try {
             const list = await API.get('/api/expenses/verified');
-            console.log('Verified Expenses Response:', list);
-            if (!list || list.length === 0) {
+            if (list.length === 0) {
                 container.innerHTML = `
                     <div class="text-center py-5 text-secondary">
                         <i class="fa-solid fa-circle-check fs-1 mb-3 opacity-50" style="color: var(--accent-emerald);"></i>
@@ -1600,172 +1551,7 @@ const App = {
             });
             container.innerHTML = html;
         } catch (err) {
-            console.error('Error loading verified expenses:', err);
-            container.innerHTML = `
-                <div class="text-center py-5 text-danger">
-                    <i class="fa-solid fa-triangle-exclamation fs-2 mb-3"></i>
-                    <p class="mb-0 text-white fw-semibold">Unable to load Verified Expenses.</p>
-                    <p class="small text-secondary mb-3">Please try again.</p>
-                    <button class="btn btn-sm btn-secondary-outline" onclick="App.loadVerifiedExpenses()">Retry</button>
-                </div>
-            `;
-        }
-    },
-
-    // ==========================================
-    // 12. STANDALONE INVITATIONS PAGE
-    // ==========================================
-    async initInvitations() {
-        console.log('Initializing Invitations page...');
-        await this.initHeader();
-        this.loadInvitationsList();
-    },
-
-    async loadInvitationsList() {
-        const container = document.getElementById('invitationsContainer');
-        if (!container) return;
-
-        console.log('Loading Pending Invitations...');
-        try {
-            const list = await API.get('/api/groups/invitations');
-            console.log('Invitations Response:', list);
-            if (!list || list.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-5 text-secondary">
-                        <i class="fa-solid fa-envelope-open fs-1 mb-3 opacity-50" style="color: var(--accent-indigo);"></i>
-                        <p class="fs-5 fw-semibold text-white mb-2">No pending invitations.</p>
-                        <p class="mb-0 text-secondary">You have no group invitations waiting for your response.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            let html = '';
-            list.forEach(inv => {
-                const date = new Date(inv.createdAt).toLocaleDateString();
-                html += `
-                    <div class="list-item-glass p-4 mb-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h5 class="fw-bold text-white mb-1">${inv.groupName}</h5>
-                                <p class="text-secondary mb-0 small">Invited by <strong>${inv.senderName}</strong> on ${date}</p>
-                            </div>
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-sm text-white px-3" style="background-color: var(--accent-emerald);" onclick="App.respondInvitationStandalone(${inv.id}, 'accept')">
-                                    <i class="fa-solid fa-check me-1"></i>Accept
-                                </button>
-                                <button class="btn btn-sm text-white px-3" style="background-color: var(--accent-rose);" onclick="App.respondInvitationStandalone(${inv.id}, 'reject')">
-                                    <i class="fa-solid fa-xmark me-1"></i>Reject
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            container.innerHTML = html;
-        } catch (err) {
-            console.error('Error loading invitations:', err);
-            container.innerHTML = `
-                <div class="text-center py-5 text-danger">
-                    <i class="fa-solid fa-triangle-exclamation fs-2 mb-3"></i>
-                    <p class="mb-0 text-white fw-semibold">Unable to load Invitations.</p>
-                    <p class="small text-secondary mb-3">Please try again.</p>
-                    <button class="btn btn-sm btn-secondary-outline" onclick="App.loadInvitationsList()">Retry</button>
-                </div>
-            `;
-        }
-    },
-
-    async respondInvitationStandalone(id, action) {
-        console.log('Responding to invitation:', id, action);
-        try {
-            await API.post(`/api/groups/invitations/${id}/${action}`, {});
-            this.loadInvitationsList();
-            this.triggerDashboardRefresh();
-        } catch (err) {
-            alert('Failed to respond to invitation: ' + err.message);
-        }
-    },
-
-    // ==========================================
-    // 13. STANDALONE EXPENSE APPROVALS PAGE
-    // ==========================================
-    async initExpenseApprovals() {
-        console.log('Initializing Expense Approvals page...');
-        await this.initHeader();
-        this.loadExpenseApprovalsList();
-    },
-
-    async loadExpenseApprovalsList() {
-        const container = document.getElementById('approvalsContainer');
-        if (!container) return;
-
-        console.log('Loading Pending Expense Approvals...');
-        try {
-            const list = await API.get('/api/expenses/pending-approvals');
-            console.log('Pending Approvals Response:', list);
-            if (!list || list.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-5 text-secondary">
-                        <i class="fa-solid fa-stamp fs-1 mb-3 opacity-50" style="color: var(--accent-indigo);"></i>
-                        <p class="fs-5 fw-semibold text-white mb-2">No pending approvals.</p>
-                        <p class="mb-0 text-secondary">All expenses are up to date!</p>
-                    </div>
-                `;
-                return;
-            }
-
-            let html = '';
-            list.forEach(appr => {
-                const statusText = appr.status === 'SUBMITTED' ? ' <span class="badge bg-info ms-2">Proof Submitted</span>' : '';
-                html += `
-                    <div class="list-item-glass p-4 mb-3">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <span class="text-white fw-semibold">${appr.userName}${statusText}</span>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-sm btn-success text-white" onclick="App.respondExpenseApprovalStandalone(${appr.id}, 'APPROVED')">
-                                <i class="fa-solid fa-check me-1"></i>Approve
-                            </button>
-                            <button class="btn btn-sm btn-danger text-white" onclick="App.respondExpenseApprovalPromptStandalone(${appr.id}, 'REJECTED')">
-                                <i class="fa-solid fa-xmark me-1"></i>Reject
-                            </button>
-                            <button class="btn btn-sm btn-warning text-white" onclick="App.respondExpenseApprovalStandalone(${appr.id}, 'REQUESTED_PROOF')">
-                                <i class="fa-solid fa-camera me-1"></i>Request Proof
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
-            container.innerHTML = html;
-        } catch (err) {
-            console.error('Error loading expense approvals:', err);
-            container.innerHTML = `
-                <div class="text-center py-5 text-danger">
-                    <i class="fa-solid fa-triangle-exclamation fs-2 mb-3"></i>
-                    <p class="mb-0 text-white fw-semibold">Unable to load Expense Approvals.</p>
-                    <p class="small text-secondary mb-3">Please try again.</p>
-                    <button class="btn btn-sm btn-secondary-outline" onclick="App.loadExpenseApprovalsList()">Retry</button>
-                </div>
-            `;
-        }
-    },
-
-    async respondExpenseApprovalStandalone(id, status, comment = '') {
-        console.log('Responding to expense approval:', id, status);
-        try {
-            await API.post(`/api/expenses/${id}/approval`, { status, comment });
-            this.loadExpenseApprovalsList();
-            this.triggerDashboardRefresh();
-        } catch (err) {
-            alert('Failed to submit approval: ' + err.message);
-        }
-    },
-
-    respondExpenseApprovalPromptStandalone(id, status) {
-        const reason = prompt('Please enter rejection reason:');
-        if (reason !== null) {
-            this.respondExpenseApprovalStandalone(id, status, reason);
+            container.innerHTML = `<p class="text-danger py-4 text-center">Failed to load verified expenses: ${err.message}</p>`;
         }
     }
 };
