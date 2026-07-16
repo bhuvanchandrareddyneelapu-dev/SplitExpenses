@@ -8,8 +8,6 @@ import com.splitwisemoney.repository.GroupMemberRepository;
 import com.splitwisemoney.repository.GroupRepository;
 import com.splitwisemoney.repository.GroupInvitationRepository;
 import com.splitwisemoney.repository.UserRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -160,7 +158,7 @@ public class GroupService {
 
     @Transactional(readOnly = true)
     public Optional<Group> getGroupById(Long groupId) {
-        return groupRepository.findById(groupId);
+        return groupRepository.findByIdWithCreator(groupId);
     }
 
     @Transactional(readOnly = true)
