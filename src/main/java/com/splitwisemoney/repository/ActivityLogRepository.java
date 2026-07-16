@@ -8,5 +8,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ActivityLogRepository extends JpaRepository<ActivityLog, Long> {
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"user"})
     Page<ActivityLog> findByUserId(Long userId, Pageable pageable);
 }

@@ -11,7 +11,8 @@ import java.util.List;
 
 @Repository
 public interface SettlementRepository extends JpaRepository<Settlement, Long> {
-    List<Settlement> findByGroupId(Long groupId);
+    @Query("SELECT s FROM Settlement s JOIN FETCH s.fromUser JOIN FETCH s.toUser WHERE s.group.id = :groupId")
+    List<Settlement> findByGroupId(@Param("groupId") Long groupId);
 
     @Query("SELECT COALESCE(SUM(s.amount), 0) FROM Settlement s WHERE s.group.id = :groupId AND s.fromUser.id = :userId AND s.status = 'SETTLED'")
     BigDecimal sumSettledAmountByGroupIdAndFromUserId(@Param("groupId") Long groupId, @Param("userId") Long userId);

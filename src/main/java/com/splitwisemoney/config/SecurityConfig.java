@@ -40,10 +40,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 // Public front-end static files
-                .requestMatchers("/", "/index.html", "/login.html", "/register.html", "/dashboard.html", 
-                               "/groups.html", "/group-details.html", "/add-expense.html", "/history.html", 
-                               "/notifications.html", "/profile.html", "/settings.html",
-                               "/css/**", "/js/**", "/favicon.ico").permitAll()
+                .requestMatchers("/", "/*.html", "/css/**", "/js/**", "/favicon.ico").permitAll()
                 // Auth APIs (login, register)
                 .requestMatchers("/api/auth/**").permitAll()
                 // Swagger Documentation

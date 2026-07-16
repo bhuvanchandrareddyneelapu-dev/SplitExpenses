@@ -13,7 +13,8 @@ import java.util.List;
 
 @Repository
 public interface ExpenseParticipantRepository extends JpaRepository<ExpenseParticipant, Long> {
-    List<ExpenseParticipant> findByExpenseId(Long expenseId);
+    @Query("SELECT ep FROM ExpenseParticipant ep JOIN FETCH ep.user WHERE ep.expense.id = :expenseId")
+    List<ExpenseParticipant> findByExpenseId(@Param("expenseId") Long expenseId);
     List<ExpenseParticipant> findByUserId(Long userId);
 
     @Modifying
