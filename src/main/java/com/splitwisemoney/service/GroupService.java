@@ -59,7 +59,7 @@ public class GroupService {
 
     @Transactional
     public Group editGroup(Long groupId, String groupName, User user) {
-        Group group = groupRepository.findById(groupId)
+        Group group = groupRepository.findByIdWithCreator(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found"));
 
         if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, user.getId())) {
@@ -151,7 +151,7 @@ public class GroupService {
 
     @Transactional(readOnly = true)
     public List<User> getGroupMembers(Long groupId) {
-        return groupMemberRepository.findByGroupId(groupId).stream()
+        return groupMemberRepository.findByGroupIdWithUser(groupId).stream()
                 .map(GroupMember::getUser)
                 .collect(Collectors.toList());
     }

@@ -89,15 +89,14 @@ public class GlobalExceptionHandler {
                   "transaction. Ensure the service method loads all required associations before the transaction closes. " +
                   "Detail: {}", request.getDescription(false), ex.getMessage(), ex);
         return errorBody(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
-                "An unexpected error occurred. Please try again later.");
+                ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred. Please try again later.");
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleGlobalException(Exception ex, WebRequest request) {
-        // Log full details server-side; never expose internals to the client
         log.error("Unhandled exception on request [{}]: {}", request.getDescription(false), ex.getMessage(), ex);
         return errorBody(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
-                "An unexpected error occurred. Please try again later.");
+                ex.getMessage() != null ? ex.getMessage() : "An unexpected error occurred. Please try again later.");
     }
 
     // ──────────────────────────────────────────

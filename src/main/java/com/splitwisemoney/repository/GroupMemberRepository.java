@@ -15,7 +15,13 @@ import java.util.Optional;
 public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> {
 
     /**
-     * Fetch memberships by group, with group data eagerly loaded.
+     * Fetch memberships by group, with user data eagerly loaded to prevent LazyInitializationException.
+     */
+    @Query("SELECT gm FROM GroupMember gm JOIN FETCH gm.user WHERE gm.group.id = :groupId")
+    List<GroupMember> findByGroupIdWithUser(@Param("groupId") Long groupId);
+
+    /**
+     * Fetch memberships by group, without eager loading.
      */
     List<GroupMember> findByGroupId(Long groupId);
 
