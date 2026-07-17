@@ -176,7 +176,12 @@ public class GroupController {
                 invitation.getGroup().getGroupName(),
                 invitation.getSender().getFullName(),
                 invitation.getStatus(),
-                invitation.getCreatedAt()
+                invitation.getCreatedAt(),
+                invitation.getInvitationToken(),
+                invitation.getInviteeEmail(),
+                invitation.getExpiresAt(),
+                invitation.getAcceptedAt(),
+                invitation.getReceiver() == null
         );
         return ResponseEntity.ok(response);
     }
@@ -195,7 +200,12 @@ public class GroupController {
                         inv.getGroup().getGroupName(),
                         inv.getSender().getFullName(),
                         inv.getStatus(),
-                        inv.getCreatedAt()
+                        inv.getCreatedAt(),
+                        inv.getInvitationToken(),
+                        inv.getInviteeEmail(),
+                        inv.getExpiresAt(),
+                        inv.getAcceptedAt(),
+                        inv.getReceiver() == null
                 ))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(response);

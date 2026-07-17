@@ -88,8 +88,14 @@
                 alertArea.style.backgroundColor = 'var(--accent-emerald)';
                 alertArea.classList.remove('d-none');
                 
+                const urlParams = new URLSearchParams(window.location.search);
+                const inviteToken = urlParams.get('invitationToken');
                 setTimeout(() => {
-                    window.location.href = 'login.html';
+                    if (inviteToken) {
+                        window.location.href = 'login.html?invitationToken=' + inviteToken;
+                    } else {
+                        window.location.href = 'login.html';
+                    }
                 }, 2000);
             } catch (err) {
                 alertArea.textContent = err.message || 'Registration failed. Email may already be registered.';

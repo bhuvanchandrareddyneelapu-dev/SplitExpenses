@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accept Group Invitation - SplitWiseMoney</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+</head>
+<body class="d-flex align-items-center justify-content-center" style="min-height: 100vh;">
+
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-5 text-center">
+                
+                <div class="mb-4">
+                    <a href="index.html" class="navbar-brand navbar-brand-custom fs-2 text-decoration-none">
+                        <i class="fa-solid fa-wallet me-2"></i>SplitWiseMoney
+                    </a>
+                </div>
+
+                <!-- Loading Spinner -->
+                <div id="inviteSpinner" class="glass-card p-5">
+                    <div class="py-4">
+                        <i class="fa-solid fa-circle-notch fa-spin fs-1 mb-3 text-indigo"></i>
+                        <h4 class="text-white fw-bold">Loading Invitation Details...</h4>
+                        <p class="text-secondary mb-0">Please wait while we verify your link.</p>
+                    </div>
+                </div>
+
+                <!-- Invitation Details Card (hidden initially) -->
+                <div id="inviteDetailsContainer" class="glass-card p-5 d-none">
+                    <div class="mb-4">
+                        <div class="icon-glow mx-auto mb-3 bg-indigo-glow" style="width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                            <i class="fa-solid fa-users fs-2 text-indigo"></i>
+                        </div>
+                        <h3 class="text-white fw-bold">Group Invitation</h3>
+                        <p class="text-secondary">You've been invited to join a group to share and simplify expenses.</p>
+                    </div>
+
+                    <div class="border border-secondary border-opacity-25 rounded-3 p-4 mb-4 text-start" style="background: rgba(255, 255, 255, 0.02);">
+                        <div class="mb-3">
+                            <span class="text-secondary small fw-medium d-block">Group Name</span>
+                            <span id="inviteGroupName" class="text-white fw-bold fs-5">--</span>
+                        </div>
+                        <div class="mb-3">
+                            <span class="text-secondary small fw-medium d-block">Invited By</span>
+                            <span id="inviteSender" class="text-white fw-semibold">--</span>
+                        </div>
+                        <div class="row">
+                            <div class="col-6 mb-0">
+                                <span class="text-secondary small fw-medium d-block">Current Members</span>
+                                <span id="inviteMemberCount" class="text-white fw-semibold">--</span>
+                            </div>
+                            <div class="col-6 mb-0">
+                                <span class="text-secondary small fw-medium d-block">Link Expires</span>
+                                <span id="inviteExpiry" class="text-white fw-semibold">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-3 mb-2">
+                        <button id="btnAcceptInvite" class="btn btn-success w-100 py-3 fw-bold">
+                            <i class="fa-solid fa-check me-2"></i>Accept &amp; Join Group
+                        </button>
+                        <button id="btnRejectInvite" class="btn btn-outline-danger w-100 py-3 fw-bold" style="background: rgba(239,68,68,0.05); border-color: rgba(239,68,68,0.25);">
+                            <i class="fa-solid fa-xmark me-2"></i>Decline
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Frontend API Connection -->
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            App.initInvitePage();
+        });
+    </script>
+</body>
+</html>

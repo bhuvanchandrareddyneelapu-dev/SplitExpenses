@@ -334,25 +334,51 @@ const App = {
                 e.preventDefault();
                 const email = document.getElementById('newMemberEmail').value;
                 const alertArea = document.getElementById('groupAlertArea');
+                const btnSubmit = addMemberForm.querySelector('button[type="submit"]');
+                const origText = btnSubmit ? btnSubmit.innerHTML : 'Invite';
 
-                alertArea.classList.add('d-none');
+                if (alertArea) alertArea.classList.add('d-none');
+                if (btnSubmit) {
+                    btnSubmit.disabled = true;
+                    btnSubmit.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin me-2"></i>Sending...';
+                }
 
                 try {
-                    await API.post(`/api/groups/${groupId}/invite`, { email });
+                    const response = await API.post(`/api/groups/${groupId}/invite`, { email });
                     document.getElementById('newMemberEmail').value = '';
 
-                    alertArea.textContent = 'Invitation sent successfully!';
-                    alertArea.className = 'alert border-0 text-white d-block';
-                    alertArea.style.backgroundColor = 'var(--accent-emerald)';
+                    let msg = 'Invitation sent successfully!';
+                    if (response && response.newUser) {
+                        msg = 'User not registered (invitation sent, account will be created after signup)';
+                    }
+
+                    if (alertArea) {
+                        alertArea.textContent = msg;
+                        alertArea.className = 'alert border-0 text-white d-block';
+                        alertArea.style.backgroundColor = 'var(--accent-emerald)';
+                    }
 
                     this.loadGroupMembers(groupId);
                     this.loadGroupSettlements(groupId);
 
-                    setTimeout(() => alertArea.classList.add('d-none'), 3000);
+                    setTimeout(() => { if (alertArea) alertArea.classList.add('d-none'); }, 5000);
                 } catch (err) {
-                    alertArea.textContent = err.message || 'Failed to add member.';
-                    alertArea.className = 'alert border-0 text-white d-block';
-                    alertArea.style.backgroundColor = 'var(--accent-rose)';
+                    let msg = err.message || 'Failed to add member.';
+                    if (msg.includes('already a member')) {
+                        msg = 'Already member: ' + msg;
+                    } else if (msg.includes('already pending') || msg.includes('already been invited')) {
+                        msg = 'Already invited: ' + msg;
+                    }
+                    if (alertArea) {
+                        alertArea.textContent = msg;
+                        alertArea.className = 'alert border-0 text-white d-block';
+                        alertArea.style.backgroundColor = 'var(--accent-rose)';
+                    }
+                } finally {
+                    if (btnSubmit) {
+                        btnSubmit.disabled = false;
+                        btnSubmit.innerHTML = origText;
+                    }
                 }
             });
         }
@@ -1552,6 +1578,182 @@ const App = {
             container.innerHTML = html;
         } catch (err) {
             container.innerHTML = `<p class="text-danger py-4 text-center">Failed to load verified expenses: ${err.message}</p>`;
+        }
+    },
+
+    // ==========================================
+    // 12. INVITATIONS SYSTEM
+    // ==========================================
+    async initInvitations() {
+        await this.initHeader();
+        this.loadInvitationsList();
+    },
+
+    async loadInvitationsList() {
+        const container = document.getElementById('invitationsContainer');
+        if (!container) return;
+
+        try {
+            const list = await API.get('/api/groups/invitations');
+            if (list.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-5 text-secondary">
+                        <i class="fa-solid fa-envelope-open fs-1 mb-3 opacity-50"></i>
+                        <p class="fs-5 fw-semibold text-white mb-2">No pending invitations.</p>
+                        <p class="mb-0 text-secondary">Any invitations to join expense groups will appear here!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            list.forEach(inv => {
+                const date = new Date(inv.createdAt).toLocaleDateString();
+                html += `
+                    <div class="list-item-glass p-4 mb-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+                        <div class="mb-3 mb-md-0">
+                            <h5 class="fw-bold text-white mb-1">📁 ${inv.groupName}</h5>
+                            <p class="text-secondary mb-0 small">Invited by <strong>${inv.senderName}</strong> on ${date}</p>
+                            <p class="text-secondary mb-0 small">Email: ${inv.inviteeEmail}</p>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-success px-3" onclick="App.acceptInvitation(${inv.id})">
+                                <i class="fa-solid fa-check me-1"></i>Accept
+                            </button>
+                            <button class="btn btn-sm btn-danger px-3" style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #ff6b6b;" onclick="App.rejectInvitation(${inv.id})">
+                                <i class="fa-solid fa-xmark me-1"></i>Decline
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        } catch (err) {
+            container.innerHTML = `<p class="text-danger py-4 text-center">Failed to load invitations: ${err.message}</p>`;
+        }
+    },
+
+    async acceptInvitation(id) {
+        try {
+            await API.post(`/api/groups/invitations/${id}/accept`);
+            alert('Invitation accepted successfully! You have joined the group.');
+            this.loadInvitationsList();
+            this.loadUnreadNotificationCount();
+        } catch (err) {
+            alert('Failed to accept invitation: ' + err.message);
+        }
+    },
+
+    async rejectInvitation(id) {
+        try {
+            await API.post(`/api/groups/invitations/${id}/reject`);
+            alert('Invitation rejected.');
+            this.loadInvitationsList();
+            this.loadUnreadNotificationCount();
+        } catch (err) {
+            alert('Failed to reject invitation: ' + err.message);
+        }
+    },
+
+    // ==========================================
+    // 13. TOKEN INVITATION PAGE
+    // ==========================================
+    async initInvitePage() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+
+        if (!token) {
+            alert('Invalid invitation token link.');
+            window.location.href = 'index.html';
+            return;
+        }
+
+        // Show details first (public API)
+        const container = document.getElementById('inviteDetailsContainer');
+        if (!container) return;
+
+        try {
+            const details = await API.get(`/api/invitations/${token}`, false);
+            
+            // Check auth status
+            const userToken = API.getToken();
+            if (!userToken) {
+                // If not logged in, redirect to login page preserving the token parameter
+                window.location.href = 'login.html?invitationToken=' + token;
+                return;
+            }
+
+            // Display invitation details
+            document.getElementById('inviteGroupName').textContent = details.groupName;
+            document.getElementById('inviteSender').textContent = details.inviterName;
+            document.getElementById('inviteMemberCount').textContent = details.groupMemberCount + ' member(s)';
+            
+            // Expiry date format
+            const expires = new Date(details.expiresAt).toLocaleDateString();
+            document.getElementById('inviteExpiry').textContent = expires;
+
+            // Setup buttons
+            document.getElementById('btnAcceptInvite').onclick = () => App.acceptInviteToken(token);
+            document.getElementById('btnRejectInvite').onclick = () => App.rejectInviteToken(token);
+            
+            // Remove loading spinner
+            container.classList.remove('d-none');
+            const spinner = document.getElementById('inviteSpinner');
+            if (spinner) spinner.classList.add('d-none');
+
+        } catch (err) {
+            container.innerHTML = `
+                <div class="text-center py-5 text-danger">
+                    <i class="fa-solid fa-circle-exclamation fs-1 mb-3"></i>
+                    <h4 class="text-white fw-bold mb-2">Invitation Error</h4>
+                    <p class="text-secondary">${err.message || 'The invitation link is invalid or has expired.'}</p>
+                    <a href="dashboard.html" class="btn btn-secondary-outline mt-3">Back to Dashboard</a>
+                </div>
+            `;
+            const spinner = document.getElementById('inviteSpinner');
+            if (spinner) spinner.classList.add('d-none');
+        }
+    },
+
+    async acceptInviteToken(token) {
+        const btnAccept = document.getElementById('btnAcceptInvite');
+        const origText = btnAccept ? btnAccept.innerHTML : 'Accept';
+        if (btnAccept) {
+            btnAccept.disabled = true;
+            btnAccept.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin me-2"></i>Accepting...';
+        }
+
+        try {
+            await API.post(`/api/invitations/${token}/accept`);
+            alert('Invitation accepted! Redirecting to dashboard...');
+            window.location.href = 'dashboard.html';
+        } catch (err) {
+            alert('Failed to accept: ' + err.message);
+            if (btnAccept) {
+                btnAccept.disabled = false;
+                btnAccept.innerHTML = origText;
+            }
+        }
+    },
+
+    async rejectInviteToken(token) {
+        const btnReject = document.getElementById('btnRejectInvite');
+        const origText = btnReject ? btnReject.innerHTML : 'Decline';
+        if (btnReject) {
+            btnReject.disabled = true;
+            btnReject.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin me-2"></i>Declining...';
+        }
+
+        try {
+            await API.post(`/api/invitations/${token}/reject`);
+            alert('Invitation declined. Redirecting to dashboard...');
+            window.location.href = 'dashboard.html';
+        } catch (err) {
+            alert('Failed to decline: ' + err.message);
+            if (btnReject) {
+                btnReject.disabled = false;
+                btnReject.innerHTML = origText;
+            }
         }
     }
 };

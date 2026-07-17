@@ -23,6 +23,10 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.splitwisemoney.entity.GroupInvitation;
+import com.splitwisemoney.repository.GroupInvitationRepository;
+import java.time.LocalDateTime;
+
 @SpringBootTest(classes = SplitWiseMoneyApplication.class)
 @Transactional
 class SplitWiseMoneyApplicationTests {
@@ -32,6 +36,9 @@ class SplitWiseMoneyApplicationTests {
 
     @Autowired
     private GroupService groupService;
+
+    @Autowired
+    private GroupInvitationRepository groupInvitationRepository;
 
     @Autowired
     private ExpenseService expenseService;
@@ -300,5 +307,74 @@ class SplitWiseMoneyApplicationTests {
         // Reload expense to check status
         Expense reloaded = expenseService.getExpenseById(expense.getId()).orElseThrow();
         assertEquals("UNDER_REVIEW", reloaded.getVerificationStatus());
+    }
+
+    @Test
+    void testCompleteGroupInvitationSystem() {
+        // 1. Setup users
+        User inviter = userService.registerUser("Inviter User", "inviter@test.com", "Password123");
+        User existingUser = userService.registerUser("Existing User", "existing@test.com", "Password123");
+        User outsider = userService.registerUser("Outsider User", "outsider@test.com", "Password123");
+        
+        Group group = groupService.createGroup("Invitation Test Group", inviter);
+        
+        // 2. Existing user invitation
+        GroupInvitation existingInv = groupService.inviteMemberByEmail(group.getId(), "existing@test.com", inviter);
+        org.junit.jupiter.api.Assertions.assertNotNull(existingInv.getInvitationToken());
+        org.junit.jupiter.api.Assertions.assertEquals("PENDING", existingInv.getStatus());
+        org.junit.jupiter.api.Assertions.assertEquals(existingUser.getId(), existingInv.getReceiver().getId());
+        
+        // 3. Duplicate invitation prevention
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            groupService.inviteMemberByEmail(group.getId(), "existing@test.com", inviter);
+        });
+
+        // 4. Accept invitation via token
+        groupService.acceptInvitationByToken(existingInv.getInvitationToken(), existingUser);
+        org.junit.jupiter.api.Assertions.assertEquals("ACCEPTED", existingInv.getStatus());
+        org.junit.jupiter.api.Assertions.assertTrue(groupService.isMember(group.getId(), existingUser.getId()));
+        
+        // 5. Already member invitation prevention
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            groupService.inviteMemberByEmail(group.getId(), "existing@test.com", inviter);
+        });
+
+        // 6. Unauthorized invitation (inviter must be member)
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            groupService.inviteMemberByEmail(group.getId(), "outsider@test.com", outsider);
+        });
+
+        // 7. New user invitation
+        GroupInvitation newInv = groupService.inviteMemberByEmail(group.getId(), "newuser@test.com", inviter);
+        org.junit.jupiter.api.Assertions.assertNull(newInv.getReceiver());
+        org.junit.jupiter.api.Assertions.assertEquals("newuser@test.com", newInv.getInviteeEmail());
+        
+        // 8. Auto-accept invitation upon new user registration
+        User newUser = userService.registerUser("New Registered User", "newuser@test.com", "Password123");
+        org.junit.jupiter.api.Assertions.assertTrue(groupService.isMember(group.getId(), newUser.getId()));
+        GroupInvitation updatedNewInv = groupService.getInvitationByToken(newInv.getInvitationToken());
+        org.junit.jupiter.api.Assertions.assertEquals("ACCEPTED", updatedNewInv.getStatus());
+        org.junit.jupiter.api.Assertions.assertEquals(newUser.getId(), updatedNewInv.getReceiver().getId());
+
+        // 9. Reject invitation via token
+        User rejectee = userService.registerUser("Rejectee User", "rejectee@test.com", "Password123");
+        GroupInvitation rejectInv = groupService.inviteMemberByEmail(group.getId(), "rejectee@test.com", inviter);
+        groupService.rejectInvitationByToken(rejectInv.getInvitationToken(), rejectee);
+        org.junit.jupiter.api.Assertions.assertEquals("REJECTED", groupService.getInvitationByToken(rejectInv.getInvitationToken()).getStatus());
+
+        // 10. Invalid token acceptance
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            groupService.acceptInvitationByToken("invalid-uuid-token", rejectee);
+        });
+
+        // 11. Expired invitation test
+        GroupInvitation expiredInv = groupService.inviteMemberByEmail(group.getId(), "expired@test.com", inviter);
+        expiredInv.setExpiresAt(LocalDateTime.now().minusSeconds(1));
+        groupInvitationRepository.saveAndFlush(expiredInv);
+        // We trigger it
+        User expiredUser = userService.registerUser("Expired User", "expired@test.com", "Password123");
+        GroupInvitation updatedExpiredInv = groupService.getInvitationByToken(expiredInv.getInvitationToken());
+        org.junit.jupiter.api.Assertions.assertEquals("EXPIRED", updatedExpiredInv.getStatus());
+        org.junit.jupiter.api.Assertions.assertFalse(groupService.isMember(group.getId(), expiredUser.getId()));
     }
 }

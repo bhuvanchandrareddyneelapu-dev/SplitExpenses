@@ -14,12 +14,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 public class GroupService {
-
-
 
     private final GroupRepository groupRepository;
     private final GroupMemberRepository groupMemberRepository;
@@ -27,19 +26,22 @@ public class GroupService {
     private final GroupInvitationRepository groupInvitationRepository;
     private final ActivityLogService activityLogService;
     private final NotificationService notificationService;
+    private final EmailService emailService;
 
     public GroupService(GroupRepository groupRepository,
                         GroupMemberRepository groupMemberRepository,
                         UserRepository userRepository,
                         GroupInvitationRepository groupInvitationRepository,
                         ActivityLogService activityLogService,
-                        NotificationService notificationService) {
+                        NotificationService notificationService,
+                        EmailService emailService) {
         this.groupRepository = groupRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.userRepository = userRepository;
         this.groupInvitationRepository = groupInvitationRepository;
         this.activityLogService = activityLogService;
         this.notificationService = notificationService;
+        this.emailService = emailService;
     }
 
     @Transactional
@@ -135,14 +137,8 @@ public class GroupService {
         notificationService.createNotification(userToRemove, "GROUP_INVITE", "You were removed from the group " + group.getGroupName());
     }
 
-    /**
-     * Returns all groups for the given user with their createdBy eagerly loaded,
-     * preventing LazyInitializationException when the controller maps the response
-     * outside this transaction boundary.
-     */
     @Transactional(readOnly = true)
     public List<Group> getUserGroups(Long userId) {
-        // Use the JOIN FETCH query so group.createdBy is loaded within this transaction
         List<GroupMember> memberships = groupMemberRepository.findByUserIdWithGroupAndCreator(userId);
         return memberships.stream()
                 .map(GroupMember::getGroup)
@@ -166,41 +162,94 @@ public class GroupService {
         return groupMemberRepository.existsByGroupIdAndUserId(groupId, userId);
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Invitation Flow
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Invite a user (registered or not) to a group by email.
+     * <ul>
+     *   <li>If the email belongs to an existing user: creates invitation, sends email, sends in-app notification.</li>
+     *   <li>If the email is unknown: creates invitation without a receiver, sends a registration-link email.</li>
+     * </ul>
+     *
+     * @return the saved {@link GroupInvitation}
+     */
     @Transactional
     public GroupInvitation inviteMemberByEmail(Long groupId, String email, User actor) {
-        Group group = groupRepository.findById(groupId)
+        Group group = groupRepository.findByIdWithCreator(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found"));
 
         if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, actor.getId())) {
-            throw new IllegalArgumentException("Only group members can invite members to the group.");
+            throw new IllegalArgumentException("Only group members can invite others to the group.");
         }
 
-        User userToInvite = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("User with email " + email + " does not exist"));
-
-        if (groupMemberRepository.existsByGroupIdAndUserId(groupId, userToInvite.getId())) {
-            throw new IllegalArgumentException("User is already a member of this group");
+        // Prevent inviting actor themselves
+        if (actor.getEmail().equalsIgnoreCase(email)) {
+            throw new IllegalArgumentException("You cannot invite yourself.");
         }
 
-        Optional<GroupInvitation> existing = groupInvitationRepository.findByGroupIdAndReceiverId(groupId, userToInvite.getId());
-        if (existing.isPresent()) {
-            GroupInvitation invitation = existing.get();
-            if ("PENDING".equals(invitation.getStatus())) {
-                throw new IllegalArgumentException("An invitation is already pending for this user");
+        Optional<User> existingUser = userRepository.findByEmail(email);
+
+        // Prevent inviting an existing group member
+        existingUser.ifPresent(u -> {
+            if (groupMemberRepository.existsByGroupIdAndUserId(groupId, u.getId())) {
+                throw new IllegalArgumentException("This user is already a member of the group.");
             }
-            invitation.setStatus("PENDING");
-            invitation.setSender(actor);
-            invitation.setRespondedAt(null);
-            return groupInvitationRepository.save(invitation);
+        });
+
+        // Check for existing invitation by email
+        Optional<GroupInvitation> existing = groupInvitationRepository.findByGroupIdAndInviteeEmail(groupId, email);
+        if (existing.isPresent()) {
+            GroupInvitation inv = existing.get();
+            if ("PENDING".equals(inv.getStatus()) && !inv.isExpired()) {
+                throw new IllegalArgumentException("An invitation is already pending for this email address.");
+            }
+            // Re-invite: reset the existing record
+            String newToken = UUID.randomUUID().toString();
+            inv.setStatus("PENDING");
+            inv.setSender(actor);
+            inv.setRespondedAt(null);
+            inv.setInvitationToken(newToken);
+            inv.setExpiresAt(LocalDateTime.now().plusDays(7));
+            existingUser.ifPresent(inv::setReceiver);
+            GroupInvitation saved = groupInvitationRepository.save(inv);
+            sendInvitationEmails(saved, actor, group, existingUser);
+            return saved;
         }
 
-        GroupInvitation invitation = new GroupInvitation(group, actor, userToInvite);
+        // Brand new invitation
+        String token = UUID.randomUUID().toString();
+        GroupInvitation invitation;
+        if (existingUser.isPresent()) {
+            invitation = new GroupInvitation(group, actor, existingUser.get());
+        } else {
+            invitation = new GroupInvitation(group, actor, email);
+        }
+        invitation.setInvitationToken(token);
+
         GroupInvitation saved = groupInvitationRepository.save(invitation);
-
-        activityLogService.log(actor, "Invited " + userToInvite.getFullName() + " to join " + group.getGroupName());
-        notificationService.createNotification(userToInvite, "GROUP_INVITATION", actor.getFullName() + " invited you to join the group " + group.getGroupName());
-
+        sendInvitationEmails(saved, actor, group, existingUser);
         return saved;
+    }
+
+    private void sendInvitationEmails(GroupInvitation inv, User actor, Group group, Optional<User> existingUser) {
+        if (existingUser.isPresent()) {
+            // Existing user: email + in-app notification
+            emailService.sendExistingUserInvitation(
+                    inv.getInviteeEmail(), actor.getFullName(), group.getGroupName(),
+                    inv.getInvitationToken(), inv.getExpiresAt());
+            notificationService.createNotification(
+                    existingUser.get(),
+                    "GROUP_INVITE",
+                    actor.getFullName() + " invited you to join the group \"" + group.getGroupName() + "\". Click to view.");
+        } else {
+            // New user: registration link email
+            emailService.sendNewUserInvitation(
+                    inv.getInviteeEmail(), actor.getFullName(), group.getGroupName(),
+                    inv.getInvitationToken(), inv.getExpiresAt());
+        }
+        activityLogService.log(actor, "Invited " + inv.getInviteeEmail() + " to join " + group.getGroupName());
     }
 
     @Transactional(readOnly = true)
@@ -208,29 +257,92 @@ public class GroupService {
         return groupInvitationRepository.findByReceiverIdAndStatus(userId, "PENDING");
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Token-based Accept / Reject
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Returns invitation details for a given token (used by the frontend invite page).
+     * Does not require the user to be the receiver — they just need to be logged in.
+     */
+    @Transactional(readOnly = true)
+    public GroupInvitation getInvitationByToken(String token) {
+        return groupInvitationRepository.findByInvitationToken(token)
+                .orElseThrow(() -> new IllegalArgumentException("Invitation not found or invalid token."));
+    }
+
+    @Transactional
+    public void acceptInvitationByToken(String token, User user) {
+        GroupInvitation invitation = groupInvitationRepository.findByInvitationToken(token)
+                .orElseThrow(() -> new IllegalArgumentException("Invitation not found or invalid token."));
+
+        validatePendingInvitation(invitation);
+        validateInviteeEmail(invitation, user);
+
+        invitation.setStatus("ACCEPTED");
+        invitation.setReceiver(user);
+        invitation.setRespondedAt(LocalDateTime.now());
+        invitation.setAcceptedAt(LocalDateTime.now());
+        groupInvitationRepository.save(invitation);
+
+        // Add as group member if not already
+        if (!groupMemberRepository.existsByGroupIdAndUserId(invitation.getGroup().getId(), user.getId())) {
+            groupMemberRepository.save(new GroupMember(invitation.getGroup(), user));
+        }
+
+        activityLogService.log(user, "Accepted invitation to join " + invitation.getGroup().getGroupName());
+        notificationService.createNotification(invitation.getSender(), "INVITE_ACCEPTED",
+                user.getFullName() + " accepted your invitation to join \"" + invitation.getGroup().getGroupName() + "\".");
+        emailService.sendInvitationAccepted(
+                invitation.getSender().getEmail(), user.getFullName(), invitation.getGroup().getGroupName());
+    }
+
+    @Transactional
+    public void rejectInvitationByToken(String token, User user) {
+        GroupInvitation invitation = groupInvitationRepository.findByInvitationToken(token)
+                .orElseThrow(() -> new IllegalArgumentException("Invitation not found or invalid token."));
+
+        validatePendingInvitation(invitation);
+        validateInviteeEmail(invitation, user);
+
+        invitation.setStatus("REJECTED");
+        invitation.setReceiver(user);
+        invitation.setRespondedAt(LocalDateTime.now());
+        groupInvitationRepository.save(invitation);
+
+        activityLogService.log(user, "Declined invitation to join " + invitation.getGroup().getGroupName());
+        notificationService.createNotification(invitation.getSender(), "INVITE_REJECTED",
+                user.getFullName() + " declined your invitation to join \"" + invitation.getGroup().getGroupName() + "\".");
+        emailService.sendInvitationRejected(
+                invitation.getSender().getEmail(), user.getFullName(), invitation.getGroup().getGroupName());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Legacy ID-based Accept / Reject (kept for backward compatibility)
+    // ─────────────────────────────────────────────────────────────────────────
+
     @Transactional
     public void acceptInvitation(Long invitationId, User user) {
         GroupInvitation invitation = groupInvitationRepository.findById(invitationId)
                 .orElseThrow(() -> new IllegalArgumentException("Invitation not found"));
 
-        if (!invitation.getReceiver().getId().equals(user.getId())) {
+        if (invitation.getReceiver() != null && !invitation.getReceiver().getId().equals(user.getId())) {
             throw new IllegalArgumentException("You are not the recipient of this invitation");
         }
-
-        if (!"PENDING".equals(invitation.getStatus())) {
-            throw new IllegalArgumentException("Invitation is not pending");
-        }
+        validatePendingInvitation(invitation);
 
         invitation.setStatus("ACCEPTED");
         invitation.setRespondedAt(LocalDateTime.now());
+        invitation.setAcceptedAt(LocalDateTime.now());
         groupInvitationRepository.save(invitation);
 
-        // Add user as a member of the group
-        GroupMember groupMember = new GroupMember(invitation.getGroup(), user);
-        groupMemberRepository.save(groupMember);
+        if (!groupMemberRepository.existsByGroupIdAndUserId(invitation.getGroup().getId(), user.getId())) {
+            groupMemberRepository.save(new GroupMember(invitation.getGroup(), user));
+        }
 
         activityLogService.log(user, "Accepted invitation to join " + invitation.getGroup().getGroupName());
-        notificationService.createNotification(invitation.getSender(), "GROUP_ACCEPTED", user.getFullName() + " accepted your invitation to join " + invitation.getGroup().getGroupName());
+        notificationService.createNotification(invitation.getSender(), "INVITE_ACCEPTED",
+                user.getFullName() + " accepted your invitation to join " + invitation.getGroup().getGroupName());
     }
 
     @Transactional
@@ -238,19 +350,70 @@ public class GroupService {
         GroupInvitation invitation = groupInvitationRepository.findById(invitationId)
                 .orElseThrow(() -> new IllegalArgumentException("Invitation not found"));
 
-        if (!invitation.getReceiver().getId().equals(user.getId())) {
+        if (invitation.getReceiver() != null && !invitation.getReceiver().getId().equals(user.getId())) {
             throw new IllegalArgumentException("You are not the recipient of this invitation");
         }
-
-        if (!"PENDING".equals(invitation.getStatus())) {
-            throw new IllegalArgumentException("Invitation is not pending");
-        }
+        validatePendingInvitation(invitation);
 
         invitation.setStatus("REJECTED");
         invitation.setRespondedAt(LocalDateTime.now());
         groupInvitationRepository.save(invitation);
 
         activityLogService.log(user, "Rejected invitation to join " + invitation.getGroup().getGroupName());
-        notificationService.createNotification(invitation.getSender(), "GROUP_REJECTED", user.getFullName() + " rejected your invitation to join " + invitation.getGroup().getGroupName());
+        notificationService.createNotification(invitation.getSender(), "INVITE_REJECTED",
+                user.getFullName() + " rejected your invitation to join " + invitation.getGroup().getGroupName());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void validatePendingInvitation(GroupInvitation inv) {
+        if (!"PENDING".equals(inv.getStatus())) {
+            throw new IllegalArgumentException("This invitation has already been " + inv.getStatus().toLowerCase() + ".");
+        }
+        if (inv.isExpired()) {
+            inv.setStatus("EXPIRED");
+            groupInvitationRepository.save(inv);
+            throw new IllegalArgumentException("This invitation has expired.");
+        }
+    }
+
+    /** Verifies that the acting user's email matches the invitation's invitee email. */
+    private void validateInviteeEmail(GroupInvitation inv, User user) {
+        if (inv.getInviteeEmail() != null && !inv.getInviteeEmail().equalsIgnoreCase(user.getEmail())) {
+            throw new IllegalArgumentException("This invitation was sent to a different email address.");
+        }
+    }
+
+    /**
+     * Called after a new user registers: finds pending invitations for their email
+     * and auto-accepts them (adds them to the group).
+     */
+    @Transactional
+    public void autoAcceptPendingInvitations(User newUser) {
+        List<GroupInvitation> pending = groupInvitationRepository
+                .findByInviteeEmailAndStatus(newUser.getEmail(), "PENDING");
+
+        for (GroupInvitation inv : pending) {
+            if (inv.isExpired()) {
+                inv.setStatus("EXPIRED");
+                groupInvitationRepository.save(inv);
+                continue;
+            }
+            if (!groupMemberRepository.existsByGroupIdAndUserId(inv.getGroup().getId(), newUser.getId())) {
+                groupMemberRepository.save(new GroupMember(inv.getGroup(), newUser));
+            }
+            inv.setStatus("ACCEPTED");
+            inv.setReceiver(newUser);
+            inv.setRespondedAt(LocalDateTime.now());
+            inv.setAcceptedAt(LocalDateTime.now());
+            groupInvitationRepository.save(inv);
+
+            notificationService.createNotification(newUser, "GROUP_INVITE",
+                    "You were automatically added to \"" + inv.getGroup().getGroupName() + "\" based on an invitation.");
+            notificationService.createNotification(inv.getSender(), "INVITE_ACCEPTED",
+                    newUser.getFullName() + " registered and joined \"" + inv.getGroup().getGroupName() + "\".");
+        }
     }
 }

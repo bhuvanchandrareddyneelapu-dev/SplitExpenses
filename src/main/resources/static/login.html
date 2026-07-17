@@ -77,7 +77,13 @@
                 const response = await API.post('/api/auth/login', { email, password }, false);
                 if (response.token) {
                     API.setToken(response.token);
-                    window.location.href = 'dashboard.html';
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const inviteToken = urlParams.get('invitationToken');
+                    if (inviteToken) {
+                        window.location.href = 'invite.html?token=' + inviteToken;
+                    } else {
+                        window.location.href = 'dashboard.html';
+                    }
                 } else {
                     alertArea.textContent = 'Invalid credentials response.';
                     alertArea.classList.remove('d-none');

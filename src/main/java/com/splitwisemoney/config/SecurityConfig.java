@@ -43,6 +43,8 @@ public class SecurityConfig {
                 .requestMatchers("/", "/*.html", "/css/**", "/js/**", "/favicon.ico").permitAll()
                 // Auth APIs (login, register)
                 .requestMatchers("/api/auth/**").permitAll()
+                // Public Group Invitations
+                .requestMatchers("/api/invitations/**").permitAll()
                 // Swagger Documentation
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 // Protected resource APIs
