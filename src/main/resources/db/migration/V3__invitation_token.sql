@@ -25,6 +25,6 @@ ALTER TABLE group_invitations ADD COLUMN accepted_at TIMESTAMP;
 UPDATE group_invitations gi
 SET
     invitee_email = (SELECT u.email FROM users u WHERE u.id = gi.receiver_id),
-    invitation_token = REPLACE(CAST(RANDOM() AS VARCHAR) || CAST(RANDOM() AS VARCHAR) || CAST(RANDOM() AS VARCHAR) || CAST(RANDOM() AS VARCHAR), '.', ''),
+    invitation_token = SUBSTRING(REPLACE(CAST(RANDOM() AS VARCHAR) || CAST(RANDOM() AS VARCHAR) || CAST(RANDOM() AS VARCHAR) || CAST(RANDOM() AS VARCHAR), '.', ''), 1, 36),
     expires_at = CURRENT_TIMESTAMP + INTERVAL '7' DAY
 WHERE gi.receiver_id IS NOT NULL;
