@@ -324,10 +324,12 @@ class SplitWiseMoneyApplicationTests {
         org.junit.jupiter.api.Assertions.assertEquals("PENDING", existingInv.getStatus());
         org.junit.jupiter.api.Assertions.assertEquals(existingUser.getId(), existingInv.getReceiver().getId());
         
-        // 3. Duplicate invitation prevention
-        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
-            groupService.inviteMemberByEmail(group.getId(), "existing@test.com", inviter);
-        });
+        // 3. Duplicate invitation — GroupService resends the email instead of throwing.
+        // The same invitation record is returned with its status still PENDING.
+        GroupInvitation resent = groupService.inviteMemberByEmail(group.getId(), "existing@test.com", inviter);
+        org.junit.jupiter.api.Assertions.assertEquals(existingInv.getId(), resent.getId(),
+                "Duplicate invite should return the same invitation record (resend path)");
+        org.junit.jupiter.api.Assertions.assertEquals("PENDING", resent.getStatus());
 
         // 4. Accept invitation via token
         groupService.acceptInvitationByToken(existingInv.getInvitationToken(), existingUser);

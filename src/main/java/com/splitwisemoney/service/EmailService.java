@@ -84,9 +84,14 @@ public class EmailService {
      * <ol>
      *   <li>Prints every relevant mail property (no passwords in clear text).</li>
      *   <li>Detects Railway / system environment variables that affect mail.</li>
-     *   <li>If mail is fully configured, sends a startup self-test email.
-     *       If that fails the application context fails to start.</li>
+     *   <li>If mail is fully configured, attempts a startup SMTP self-test.</li>
      * </ol>
+     *
+     * <p><b>CRITICAL:</b> This method NEVER throws. Any failure is recorded as an
+     * ERROR log only. The Spring context must always load regardless of SMTP state.
+     * Throwing from @PostConstruct kills the Spring context and causes a crash loop
+     * on Railway, because Railway periodically restarts containers and a transient
+     * SMTP error would permanently prevent the app from restarting.
      */
     @PostConstruct
     public void startupMailDiagnostic() {
@@ -130,31 +135,31 @@ public class EmailService {
             return;
         }
         if (isBlank(fromAddress)) {
-            String msg = "[EmailService] FATAL: spring.mail.enabled=true but MAIL_USERNAME is empty. " +
-                         "Set the MAIL_USERNAME environment variable in Railway.";
-            log.error(msg);
+            log.error("[EmailService]  MAIL_USERNAME is empty — invitation emails will be SKIPPED.");
+            log.error("[EmailService]  Set the MAIL_USERNAME environment variable in Railway.");
             log.info("=================================================================");
-            throw new IllegalStateException(msg);
+            return;   // LOG ONLY — never throw from @PostConstruct
         }
         if (isBlank(smtpPassword)) {
-            String msg = "[EmailService] FATAL: spring.mail.enabled=true but MAIL_PASSWORD is empty. " +
-                         "Set the MAIL_PASSWORD environment variable in Railway (use a Gmail App Password).";
-            log.error(msg);
+            log.error("[EmailService]  MAIL_PASSWORD is empty — invitation emails will be SKIPPED.");
+            log.error("[EmailService]  Set the MAIL_PASSWORD env variable (Gmail App Password).");
             log.info("=================================================================");
-            throw new IllegalStateException(msg);
+            return;   // LOG ONLY — never throw from @PostConstruct
         }
 
-        log.info("[EmailService]  Mail IS fully configured. Sending SMTP startup self-test...");
+        log.info("[EmailService]  Mail IS fully configured. Running SMTP startup self-test...");
         log.info("=================================================================");
 
-        // ── 4. Startup Self-Test Email ────────────────────────────────────────
+        // ── 4. Startup Self-Test Email — non-fatal ────────────────────────────
         sendStartupTestEmail();
     }
 
     /**
-     * Sends a plain-text test email to the configured sender address (self-send)
-     * immediately at startup. Throws {@link IllegalStateException} wrapping the
-     * SMTP exception if delivery fails, which aborts the Spring context.
+     * Attempts a plain-text self-send SMTP test at startup.
+     *
+     * <p><b>NEVER THROWS.</b> Any SMTP failure is logged as ERROR.
+     * The app continues starting regardless. Use {@code POST /api/test/email}
+     * to manually re-verify SMTP connectivity after deployment.
      */
     private void sendStartupTestEmail() {
         String subject = "SplitWise SMTP Startup Test";
@@ -172,49 +177,51 @@ public class EmailService {
             MimeMessage msg = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(msg, false, "UTF-8");
             helper.setFrom(fromAddress);
-            helper.setTo(fromAddress);      // self-send to verify delivery
+            helper.setTo(fromAddress);   // self-send to verify delivery
             helper.setSubject(subject);
-            helper.setText(body, false);    // plain text — simplest possible payload
+            helper.setText(body, false); // plain text — simplest possible payload
 
             log.info("[EmailService]   Invoking mailSender.send() for startup test...");
             mailSender.send(msg);
 
             log.info("=================================================================");
             log.info("[EmailService] ✓ STARTUP SELF-TEST: SMTP ACCEPTED MESSAGE");
-            log.info("[EmailService]   Gmail successfully accepted the startup test email.");
             log.info("[EmailService]   FINAL VERDICT: ✓ Email successfully accepted by Gmail SMTP.");
             log.info("=================================================================");
 
         } catch (jakarta.mail.MessagingException e) {
-            String msg2 = "SMTP startup self-test failed — MessagingException: " + e.getMessage();
+            // LOG but DO NOT THROW — app must start regardless of SMTP state
             log.error("=================================================================");
-            log.error("[EmailService] ✗ STARTUP SELF-TEST FAILED (MessagingException)");
-            log.error("[EmailService]   {}", e.getMessage(), e);
+            log.error("[EmailService] ✗ STARTUP SELF-TEST FAILED (MessagingException): {}", e.getMessage(), e);
             log.error("[EmailService]   FINAL VERDICT: ✗ Email rejected by Gmail. Reason: {}", e.getMessage());
+            log.error("[EmailService]   App continues starting. Use POST /api/test/email to diagnose.");
             log.error("=================================================================");
-            throw new IllegalStateException(msg2, e);
 
         } catch (MailException e) {
-            // MailException wraps the raw SMTP response — e.getMessage() contains
-            // the Gmail status code (e.g. "535-5.7.8 Username and Password not accepted")
+            // LOG but DO NOT THROW — app must start regardless of SMTP state
             String rootMsg = e.getMostSpecificCause() != null
                              ? e.getMostSpecificCause().getMessage()
                              : e.getMessage();
             log.error("=================================================================");
-            log.error("[EmailService] ✗ STARTUP SELF-TEST FAILED (MailException / SMTP Error)");
-            log.error("[EmailService]   Top-level : {}", e.getMessage());
-            log.error("[EmailService]   Root cause: {}", rootMsg, e);
-            log.error("[EmailService]   Likely causes:");
-            log.error("[EmailService]     535 / 534 → Gmail App Password is invalid or revoked.");
-            log.error("[EmailService]               → Regenerate at myaccount.google.com → Security → App Passwords.");
-            log.error("[EmailService]     530       → Authentication required / TLS not negotiated.");
-            log.error("[EmailService]     550       → Sending quota exceeded or policy block.");
-            log.error("[EmailService]     Connection refused / timeout → Firewall blocking port 587.");
+            log.error("[EmailService] ✗ STARTUP SELF-TEST FAILED (SMTP/MailException)");
+            log.error("[EmailService]   Top-level error : {}", e.getMessage());
+            log.error("[EmailService]   Root cause      : {}", rootMsg, e);
+            log.error("[EmailService]   535/534 → Invalid Gmail App Password. Regenerate at myaccount.google.com");
+            log.error("[EmailService]   530     → TLS not negotiated / auth required.");
+            log.error("[EmailService]   550     → Quota exceeded or policy block.");
+            log.error("[EmailService]   CONN    → Firewall blocking port 587.");
             log.error("[EmailService]   FINAL VERDICT: ✗ Email rejected by Gmail. Reason: {}", rootMsg);
+            log.error("[EmailService]   App continues starting. Use POST /api/test/email to diagnose.");
             log.error("=================================================================");
-            throw new IllegalStateException("SMTP startup self-test failed: " + rootMsg, e);
+
+        } catch (Exception e) {
+            // Catch-all safety net — no exception whatsoever should abort the Spring context
+            log.error("[EmailService] ✗ STARTUP SELF-TEST FAILED (unexpected {}): {}",
+                      e.getClass().getSimpleName(), e.getMessage(), e);
+            log.error("[EmailService]   App continues starting. Use POST /api/test/email to diagnose.");
         }
     }
+
 
     // ─────────────────────────────────────────────────────────────────────────
     // Public API — Invitation Emails

@@ -47,6 +47,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/invitations/**").permitAll()
                 // Swagger Documentation
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                // Railway health check probe — must be unauthenticated
+                .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                // SMTP diagnostic endpoint — permit so it can be called after deployment
+                // to verify email config independently of business logic
+                .requestMatchers("/api/test/**").permitAll()
                 // Protected resource APIs
                 .anyRequest().authenticated()
             );
