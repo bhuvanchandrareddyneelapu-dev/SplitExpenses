@@ -10,6 +10,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.MailException;
@@ -27,8 +29,11 @@ import java.util.stream.Collectors;
 @Tag(name = "Groups", description = "Endpoints for managing group configurations and group memberships")
 public class GroupController {
 
+    private static final Logger log = LoggerFactory.getLogger(GroupController.class);
+
     private final GroupService groupService;
     private final UserService userService;
+
 
     public GroupController(GroupService groupService, UserService userService) {
         this.groupService = groupService;
@@ -167,6 +172,7 @@ public class GroupController {
     @PostMapping("/{id}/invite")
     @Operation(summary = "Invite a user member to a group by email. Resends automatically if a pending invitation already exists.")
     public ResponseEntity<?> inviteMember(@PathVariable Long id, @Valid @RequestBody InviteMemberRequest request) {
+        log.info("[GroupController] Entry: POST /api/groups/{}/invite received for email={}", id, request.getEmail());
         User user = getAuthenticatedUser();
         if (user == null) return unauthorized();
 

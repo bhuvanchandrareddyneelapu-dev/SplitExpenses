@@ -56,6 +56,15 @@ public class GroupInvitation {
     @Column(name = "accepted_at")
     private LocalDateTime acceptedAt;
 
+    @Column(name = "email_delivery_status", length = 20)
+    private String emailDeliveryStatus; // PENDING, SENT, FAILED, SKIPPED
+
+    @Column(name = "email_delivery_error", columnDefinition = "TEXT")
+    private String emailDeliveryError;
+
+    @Column(name = "email_last_attempt_at")
+    private LocalDateTime emailLastAttemptAt;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -65,7 +74,11 @@ public class GroupInvitation {
         if (expiresAt == null) {
             expiresAt = LocalDateTime.now().plusDays(7);
         }
+        if (emailDeliveryStatus == null) {
+            emailDeliveryStatus = "PENDING";
+        }
     }
+
 
     public GroupInvitation() {}
 
@@ -126,4 +139,14 @@ public class GroupInvitation {
 
     public LocalDateTime getAcceptedAt() { return acceptedAt; }
     public void setAcceptedAt(LocalDateTime acceptedAt) { this.acceptedAt = acceptedAt; }
+
+    public String getEmailDeliveryStatus() { return emailDeliveryStatus; }
+    public void setEmailDeliveryStatus(String emailDeliveryStatus) { this.emailDeliveryStatus = emailDeliveryStatus; }
+
+    public String getEmailDeliveryError() { return emailDeliveryError; }
+    public void setEmailDeliveryError(String emailDeliveryError) { this.emailDeliveryError = emailDeliveryError; }
+
+    public LocalDateTime getEmailLastAttemptAt() { return emailLastAttemptAt; }
+    public void setEmailLastAttemptAt(LocalDateTime emailLastAttemptAt) { this.emailLastAttemptAt = emailLastAttemptAt; }
 }
+

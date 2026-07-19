@@ -266,10 +266,7 @@ public class GroupService {
         if (existingUser.isPresent()) {
             // Existing user: email + in-app notification
             log.info("[GroupService]   Sending existing-user invitation email to={}", inv.getInviteeEmail());
-            emailService.sendExistingUserInvitation(
-                    inv.getInviteeEmail(), actor.getFullName(), group.getGroupName(),
-                    inv.getInvitationToken(), inv.getExpiresAt());
-            log.info("[GroupService]   Returned from EmailService.sendExistingUserInvitation()");
+            emailService.sendExistingUserInvitation(inv, actor.getFullName(), group.getGroupName());
             notificationService.createNotification(
                     existingUser.get(),
                     "GROUP_INVITE",
@@ -277,14 +274,12 @@ public class GroupService {
         } else {
             // New user: registration link email
             log.info("[GroupService]   Sending new-user registration email to={}", inv.getInviteeEmail());
-            emailService.sendNewUserInvitation(
-                    inv.getInviteeEmail(), actor.getFullName(), group.getGroupName(),
-                    inv.getInvitationToken(), inv.getExpiresAt());
-            log.info("[GroupService]   Returned from EmailService.sendNewUserInvitation()");
+            emailService.sendNewUserInvitation(inv, actor.getFullName(), group.getGroupName());
         }
         activityLogService.log(actor, "Invited " + inv.getInviteeEmail() + " to join " + group.getGroupName());
         log.info("[GroupService] sendInvitationEmails() complete for inviteeEmail={}", inv.getInviteeEmail());
     }
+
 
     /**
      * Explicitly resend the invitation email for an existing PENDING invitation.
