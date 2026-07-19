@@ -8,6 +8,10 @@ import com.splitwisemoney.repository.GroupMemberRepository;
 import com.splitwisemoney.repository.GroupRepository;
 import com.splitwisemoney.repository.GroupInvitationRepository;
 import com.splitwisemoney.repository.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +24,8 @@ import java.util.stream.Collectors;
 @Service
 public class GroupService {
 
+    private static final Logger log = LoggerFactory.getLogger(GroupService.class);
+
     private final GroupRepository groupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final UserRepository userRepository;
@@ -27,6 +33,9 @@ public class GroupService {
     private final ActivityLogService activityLogService;
     private final NotificationService notificationService;
     private final EmailService emailService;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public GroupService(GroupRepository groupRepository,
                         GroupMemberRepository groupMemberRepository,
@@ -177,6 +186,9 @@ public class GroupService {
      */
     @Transactional
     public GroupInvitation inviteMemberByEmail(Long groupId, String email, User actor) {
+        log.info("[GroupService] Entering inviteMemberByEmail() — groupId={}, inviteeEmail={}, actor={}",
+                 groupId, email, actor.getEmail());
+
         Group group = groupRepository.findByIdWithCreator(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found"));
 
@@ -190,6 +202,7 @@ public class GroupService {
         }
 
         Optional<User> existingUser = userRepository.findByEmail(email);
+        log.info("[GroupService]   Invitee is registered user: {}", existingUser.isPresent());
 
         // Prevent inviting an existing group member
         existingUser.ifPresent(u -> {
@@ -202,10 +215,15 @@ public class GroupService {
         Optional<GroupInvitation> existing = groupInvitationRepository.findByGroupIdAndInviteeEmail(groupId, email);
         if (existing.isPresent()) {
             GroupInvitation inv = existing.get();
+            log.info("[GroupService]   Existing invitation found — status={}, expired={}",
+                     inv.getStatus(), inv.isExpired());
             if ("PENDING".equals(inv.getStatus()) && !inv.isExpired()) {
-                throw new IllegalArgumentException("An invitation is already pending for this email address.");
+                // Still pending — resend the email rather than blocking the request
+                log.info("[GroupService]   Resending email for existing PENDING invitation id={}", inv.getId());
+                sendInvitationEmails(inv, actor, group, existingUser);
+                return inv;
             }
-            // Re-invite: reset the existing record
+            // Expired, rejected, or accepted — reset and re-invite
             String newToken = UUID.randomUUID().toString();
             inv.setStatus("PENDING");
             inv.setSender(actor);
@@ -214,6 +232,7 @@ public class GroupService {
             inv.setExpiresAt(LocalDateTime.now().plusDays(7));
             existingUser.ifPresent(inv::setReceiver);
             GroupInvitation saved = groupInvitationRepository.save(inv);
+            log.info("[GroupService]   Invitation reset and saved. id={} token={}", saved.getId(), newToken);
             sendInvitationEmails(saved, actor, group, existingUser);
             return saved;
         }
@@ -229,27 +248,75 @@ public class GroupService {
         invitation.setInvitationToken(token);
 
         GroupInvitation saved = groupInvitationRepository.save(invitation);
+        log.info("[GroupService]   Invitation saved. id={} status={} inviteeEmail={} token={}",
+                 saved.getId(), saved.getStatus(), saved.getInviteeEmail(), token);
+
+        // Flush to ensure DB record exists before the email is sent
+        entityManager.flush();
+        log.info("[GroupService]   DB flush complete. Calling EmailService.send*Invitation()...");
         sendInvitationEmails(saved, actor, group, existingUser);
+        log.info("[GroupService]   Returned from EmailService. inviteMemberByEmail() complete.");
         return saved;
     }
 
     private void sendInvitationEmails(GroupInvitation inv, User actor, Group group, Optional<User> existingUser) {
+        log.info("[GroupService] Calling EmailService.send*Invitation() — inviteeEmail={} existingUser={}",
+                 inv.getInviteeEmail(), existingUser.isPresent());
+
         if (existingUser.isPresent()) {
             // Existing user: email + in-app notification
+            log.info("[GroupService]   Sending existing-user invitation email to={}", inv.getInviteeEmail());
             emailService.sendExistingUserInvitation(
                     inv.getInviteeEmail(), actor.getFullName(), group.getGroupName(),
                     inv.getInvitationToken(), inv.getExpiresAt());
+            log.info("[GroupService]   Returned from EmailService.sendExistingUserInvitation()");
             notificationService.createNotification(
                     existingUser.get(),
                     "GROUP_INVITE",
                     actor.getFullName() + " invited you to join the group \"" + group.getGroupName() + "\". Click to view.");
         } else {
             // New user: registration link email
+            log.info("[GroupService]   Sending new-user registration email to={}", inv.getInviteeEmail());
             emailService.sendNewUserInvitation(
                     inv.getInviteeEmail(), actor.getFullName(), group.getGroupName(),
                     inv.getInvitationToken(), inv.getExpiresAt());
+            log.info("[GroupService]   Returned from EmailService.sendNewUserInvitation()");
         }
         activityLogService.log(actor, "Invited " + inv.getInviteeEmail() + " to join " + group.getGroupName());
+        log.info("[GroupService] sendInvitationEmails() complete for inviteeEmail={}", inv.getInviteeEmail());
+    }
+
+    /**
+     * Explicitly resend the invitation email for an existing PENDING invitation.
+     * Useful when the original email was not delivered.
+     */
+    @Transactional
+    public GroupInvitation resendInvitation(Long groupId, String email, User actor) {
+        Group group = groupRepository.findByIdWithCreator(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("Group not found"));
+
+        if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, actor.getId())) {
+            throw new IllegalArgumentException("Only group members can resend invitations.");
+        }
+
+        GroupInvitation inv = groupInvitationRepository.findByGroupIdAndInviteeEmail(groupId, email)
+                .orElseThrow(() -> new IllegalArgumentException("No invitation found for " + email + " in this group."));
+
+        if (!"PENDING".equals(inv.getStatus())) {
+            throw new IllegalArgumentException("Cannot resend: invitation status is " + inv.getStatus() + ".");
+        }
+
+        if (inv.isExpired()) {
+            // Extend expiry and generate a fresh token
+            inv.setInvitationToken(UUID.randomUUID().toString());
+            inv.setExpiresAt(LocalDateTime.now().plusDays(7));
+            groupInvitationRepository.save(inv);
+            entityManager.flush();
+        }
+
+        Optional<User> existingUser = userRepository.findByEmail(email);
+        sendInvitationEmails(inv, actor, group, existingUser);
+        return inv;
     }
 
     @Transactional(readOnly = true)

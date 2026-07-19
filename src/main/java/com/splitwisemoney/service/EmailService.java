@@ -3,18 +3,36 @@ package com.splitwisemoney.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailException;
+import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.mail.internet.MimeMessage;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
- * Sends HTML invitation emails via Spring Mail.
- * If {@code mail.enabled=false} or no SMTP credentials are configured,
- * all send attempts are silently logged and skipped (dev-friendly).
+ * Sends HTML invitation emails via Spring Mail / Gmail SMTP.
+ *
+ * <p><b>Startup behaviour:</b>
+ * <ol>
+ *   <li>Dumps the complete mail configuration on startup (passwords masked).</li>
+ *   <li>If {@code spring.mail.enabled=true} AND credentials are present, sends a
+ *       one-shot self-test email to verify SMTP connectivity. Application startup
+ *       fails fast with the full SMTP exception if this test fails.</li>
+ * </ol>
+ *
+ * <p><b>Per-send behaviour:</b>
+ * <ul>
+ *   <li>Logs FROM / TO / SUBJECT / SMTP HOST / SMTP PORT before every send.</li>
+ *   <li>Logs {@code SMTP ACCEPTED MESSAGE} after successful transport.</li>
+ *   <li>Logs complete stack trace with SMTP status on failure and re-throws.</li>
+ * </ul>
  */
 @Service
 public class EmailService {
@@ -24,30 +42,191 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
+    // ── Injected Spring Mail properties ──────────────────────────────────────
+
     @Value("${spring.mail.username:}")
     private String fromAddress;
+
+    @Value("${spring.mail.password:}")
+    private String smtpPassword;          // value never logged; only .isBlank() is checked
+
+    @Value("${spring.mail.host:smtp.gmail.com}")
+    private String smtpHost;
+
+    @Value("${spring.mail.port:587}")
+    private int smtpPort;
+
+    @Value("${spring.mail.enabled:false}")
+    private boolean mailEnabled;
 
     @Value("${app.base-url:http://localhost:8080}")
     private String baseUrl;
 
-    @Value("${spring.mail.enabled:false}")
-    private boolean mailEnabled;
+    // ─────────────────────────────────────────────────────────────────────────
 
     public EmailService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
     }
 
+    /** True when mail is enabled AND credentials are actually configured. */
+    private boolean isMailConfigured() {
+        return mailEnabled
+                && fromAddress != null && !fromAddress.isBlank()
+                && smtpPassword != null && !smtpPassword.isBlank();
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
-    // Public send methods
+    // Startup Diagnostic & Self-Test
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Runs immediately after the bean is constructed.
+     * <ol>
+     *   <li>Prints every relevant mail property (no passwords in clear text).</li>
+     *   <li>Detects Railway / system environment variables that affect mail.</li>
+     *   <li>If mail is fully configured, sends a startup self-test email.
+     *       If that fails the application context fails to start.</li>
+     * </ol>
+     */
+    @PostConstruct
+    public void startupMailDiagnostic() {
+
+        // ── 1. Property Dump ─────────────────────────────────────────────────
+        log.info("=================================================================");
+        log.info("[EmailService] STARTUP MAIL CONFIGURATION DIAGNOSTIC");
+        log.info("=================================================================");
+        log.info("[EmailService]  spring.mail.enabled    = {}", mailEnabled);
+        log.info("[EmailService]  spring.mail.host       = {}", smtpHost);
+        log.info("[EmailService]  spring.mail.port       = {}", smtpPort);
+        log.info("[EmailService]  spring.mail.username   = {}",
+                isBlank(fromAddress) ? "<EMPTY>" : fromAddress);
+        log.info("[EmailService]  MAIL_USERNAME set      = {}", !isBlank(fromAddress));
+        log.info("[EmailService]  MAIL_PASSWORD set      = {}", !isBlank(smtpPassword));
+
+        // ── 2. Railway / System Environment Variable Detection ───────────────
+        log.info("-----------------------------------------------------------------");
+        log.info("[EmailService]  ENVIRONMENT VARIABLE DETECTION");
+        log.info("-----------------------------------------------------------------");
+        String[] envKeys = {
+            "MAIL_USERNAME", "MAIL_PASSWORD",
+            "SPRING_MAIL_USERNAME", "SPRING_MAIL_PASSWORD"
+        };
+        for (String key : envKeys) {
+            String val = System.getenv(key);
+            if (val == null) {
+                log.warn("[EmailService]    {} = <NOT SET in environment>", key);
+            } else if (key.contains("PASSWORD")) {
+                log.info("[EmailService]    {} = <SET, {} chars>", key, val.length());
+            } else {
+                log.info("[EmailService]    {} = {}", key, val);
+            }
+        }
+
+        // ── 3. Decision Gate ─────────────────────────────────────────────────
+        log.info("-----------------------------------------------------------------");
+        if (!mailEnabled) {
+            log.warn("[EmailService]  spring.mail.enabled=false — all emails will be SKIPPED.");
+            log.info("=================================================================");
+            return;
+        }
+        if (isBlank(fromAddress)) {
+            String msg = "[EmailService] FATAL: spring.mail.enabled=true but MAIL_USERNAME is empty. " +
+                         "Set the MAIL_USERNAME environment variable in Railway.";
+            log.error(msg);
+            log.info("=================================================================");
+            throw new IllegalStateException(msg);
+        }
+        if (isBlank(smtpPassword)) {
+            String msg = "[EmailService] FATAL: spring.mail.enabled=true but MAIL_PASSWORD is empty. " +
+                         "Set the MAIL_PASSWORD environment variable in Railway (use a Gmail App Password).";
+            log.error(msg);
+            log.info("=================================================================");
+            throw new IllegalStateException(msg);
+        }
+
+        log.info("[EmailService]  Mail IS fully configured. Sending SMTP startup self-test...");
+        log.info("=================================================================");
+
+        // ── 4. Startup Self-Test Email ────────────────────────────────────────
+        sendStartupTestEmail();
+    }
+
+    /**
+     * Sends a plain-text test email to the configured sender address (self-send)
+     * immediately at startup. Throws {@link IllegalStateException} wrapping the
+     * SMTP exception if delivery fails, which aborts the Spring context.
+     */
+    private void sendStartupTestEmail() {
+        String subject = "SplitWise SMTP Startup Test";
+        String body    = "SMTP configuration successful. " +
+                         "This message confirms that Gmail SMTP is reachable from the application.";
+
+        log.info("[EmailService] ── STARTUP SMTP SELF-TEST ──────────────────────────────");
+        log.info("[EmailService]   FROM    : {}", fromAddress);
+        log.info("[EmailService]   TO      : {} (self-send)", fromAddress);
+        log.info("[EmailService]   SUBJECT : {}", subject);
+        log.info("[EmailService]   HOST    : {}", smtpHost);
+        log.info("[EmailService]   PORT    : {}", smtpPort);
+
+        try {
+            MimeMessage msg = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(msg, false, "UTF-8");
+            helper.setFrom(fromAddress);
+            helper.setTo(fromAddress);      // self-send to verify delivery
+            helper.setSubject(subject);
+            helper.setText(body, false);    // plain text — simplest possible payload
+
+            log.info("[EmailService]   Invoking mailSender.send() for startup test...");
+            mailSender.send(msg);
+
+            log.info("=================================================================");
+            log.info("[EmailService] ✓ STARTUP SELF-TEST: SMTP ACCEPTED MESSAGE");
+            log.info("[EmailService]   Gmail successfully accepted the startup test email.");
+            log.info("[EmailService]   FINAL VERDICT: ✓ Email successfully accepted by Gmail SMTP.");
+            log.info("=================================================================");
+
+        } catch (jakarta.mail.MessagingException e) {
+            String msg2 = "SMTP startup self-test failed — MessagingException: " + e.getMessage();
+            log.error("=================================================================");
+            log.error("[EmailService] ✗ STARTUP SELF-TEST FAILED (MessagingException)");
+            log.error("[EmailService]   {}", e.getMessage(), e);
+            log.error("[EmailService]   FINAL VERDICT: ✗ Email rejected by Gmail. Reason: {}", e.getMessage());
+            log.error("=================================================================");
+            throw new IllegalStateException(msg2, e);
+
+        } catch (MailException e) {
+            // MailException wraps the raw SMTP response — e.getMessage() contains
+            // the Gmail status code (e.g. "535-5.7.8 Username and Password not accepted")
+            String rootMsg = e.getMostSpecificCause() != null
+                             ? e.getMostSpecificCause().getMessage()
+                             : e.getMessage();
+            log.error("=================================================================");
+            log.error("[EmailService] ✗ STARTUP SELF-TEST FAILED (MailException / SMTP Error)");
+            log.error("[EmailService]   Top-level : {}", e.getMessage());
+            log.error("[EmailService]   Root cause: {}", rootMsg, e);
+            log.error("[EmailService]   Likely causes:");
+            log.error("[EmailService]     535 / 534 → Gmail App Password is invalid or revoked.");
+            log.error("[EmailService]               → Regenerate at myaccount.google.com → Security → App Passwords.");
+            log.error("[EmailService]     530       → Authentication required / TLS not negotiated.");
+            log.error("[EmailService]     550       → Sending quota exceeded or policy block.");
+            log.error("[EmailService]     Connection refused / timeout → Firewall blocking port 587.");
+            log.error("[EmailService]   FINAL VERDICT: ✗ Email rejected by Gmail. Reason: {}", rootMsg);
+            log.error("=================================================================");
+            throw new IllegalStateException("SMTP startup self-test failed: " + rootMsg, e);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Public API — Invitation Emails
     // ─────────────────────────────────────────────────────────────────────────
 
     /** Email for an EXISTING registered user being invited. */
     public void sendExistingUserInvitation(String toEmail, String inviterName, String groupName,
                                            String token, LocalDateTime expiresAt) {
-        String subject = inviterName + " invited you to join \"" + groupName + "\" on SplitWiseMoney";
+        String subject   = inviterName + " invited you to join \"" + groupName + "\" on SplitWiseMoney";
         String acceptUrl = baseUrl + "/invite.html?token=" + token;
         String rejectUrl = baseUrl + "/api/invitations/" + token + "/reject";
-        String expiry = expiresAt != null ? expiresAt.format(FMT) : "7 days from now";
+        String expiry    = expiresAt != null ? expiresAt.format(FMT) : "7 days from now";
 
         String html = buildExistingUserHtml(inviterName, groupName, acceptUrl, rejectUrl, expiry);
         send(toEmail, subject, html);
@@ -56,9 +235,9 @@ public class EmailService {
     /** Email for a NON-REGISTERED email being invited (includes registration link). */
     public void sendNewUserInvitation(String toEmail, String inviterName, String groupName,
                                       String token, LocalDateTime expiresAt) {
-        String subject = "You're invited to join \"" + groupName + "\" on SplitWiseMoney";
+        String subject     = "You're invited to join \"" + groupName + "\" on SplitWiseMoney";
         String registerUrl = baseUrl + "/register.html?invitationToken=" + token;
-        String expiry = expiresAt != null ? expiresAt.format(FMT) : "7 days from now";
+        String expiry      = expiresAt != null ? expiresAt.format(FMT) : "7 days from now";
 
         String html = buildNewUserHtml(inviterName, groupName, registerUrl, expiry);
         send(toEmail, subject, html);
@@ -67,7 +246,7 @@ public class EmailService {
     /** Notify inviter that their invitation was accepted. */
     public void sendInvitationAccepted(String toEmail, String accepterName, String groupName) {
         String subject = accepterName + " joined \"" + groupName + "\"";
-        String html = buildStatusHtml("🎉 Invitation Accepted",
+        String html    = buildStatusHtml("🎉 Invitation Accepted",
                 accepterName + " has accepted your invitation and joined <strong>" + groupName + "</strong>.",
                 "#27ae60");
         send(toEmail, subject, html);
@@ -76,10 +255,157 @@ public class EmailService {
     /** Notify inviter that their invitation was rejected. */
     public void sendInvitationRejected(String toEmail, String rejectorName, String groupName) {
         String subject = rejectorName + " declined your invitation to \"" + groupName + "\"";
-        String html = buildStatusHtml("Invitation Declined",
+        String html    = buildStatusHtml("Invitation Declined",
                 rejectorName + " has declined your invitation to join <strong>" + groupName + "</strong>.",
                 "#e74c3c");
         send(toEmail, subject, html);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Public API — Direct SMTP Test (used by /api/test/email endpoint)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Sends a bare-bones plain-text test email, bypassing all invitation logic.
+     * Intended for the {@code POST /api/test/email} diagnostic endpoint.
+     *
+     * @param to  recipient address
+     * @return    diagnostic result map with keys: success, from, to, smtpHost, smtpPort, message
+     * @throws MailException if SMTP rejects the message
+     */
+    public Map<String, Object> sendTestEmail(String to) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("from",     fromAddress);
+        result.put("to",       to);
+        result.put("smtpHost", smtpHost);
+        result.put("smtpPort", smtpPort);
+        result.put("mailEnabled", mailEnabled);
+        result.put("credentialsSet", !isBlank(fromAddress) && !isBlank(smtpPassword));
+
+        log.info("[EmailService] ── /api/test/email DIRECT SMTP TEST ──────────────────");
+        log.info("[EmailService]   FROM    : {}", fromAddress);
+        log.info("[EmailService]   TO      : {}", to);
+        log.info("[EmailService]   SUBJECT : SMTP TEST");
+        log.info("[EmailService]   HOST    : {}", smtpHost);
+        log.info("[EmailService]   PORT    : {}", smtpPort);
+
+        if (!isMailConfigured()) {
+            String reason = !mailEnabled
+                    ? "spring.mail.enabled=false"
+                    : isBlank(fromAddress)
+                      ? "MAIL_USERNAME is empty"
+                      : "MAIL_PASSWORD is empty";
+            log.error("[EmailService] ✗ Cannot send test email — mail not configured: {}", reason);
+            result.put("success", false);
+            result.put("message", "Mail not configured: " + reason);
+            result.put("verdict", "✗ Spring Boot is not loading the mail configuration.");
+            return result;
+        }
+
+        try {
+            MimeMessage msg = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(msg, false, "UTF-8");
+            helper.setFrom(fromAddress);
+            helper.setTo(to);
+            helper.setSubject("SMTP TEST");
+            helper.setText("This is a direct SMTP verification.\n\nSent from: " + fromAddress +
+                           "\nSMTP Host: " + smtpHost + ":" + smtpPort, false);
+
+            log.info("[EmailService]   Invoking mailSender.send()...");
+            mailSender.send(msg);
+
+            log.info("[EmailService] ✓ SMTP TEST: SMTP ACCEPTED MESSAGE");
+            log.info("[EmailService]   FINAL VERDICT: ✓ Email successfully accepted by Gmail SMTP.");
+            result.put("success", true);
+            result.put("verdict", "✓ Email successfully accepted by Gmail SMTP.");
+            result.put("message", "SMTP ACCEPTED MESSAGE — Gmail returned 250 OK.");
+            return result;
+
+        } catch (jakarta.mail.MessagingException e) {
+            log.error("[EmailService] ✗ SMTP TEST: MessagingException — {}", e.getMessage(), e);
+            result.put("success", false);
+            result.put("verdict", "✗ Email rejected by Gmail. Reason: " + e.getMessage());
+            result.put("message", e.getMessage());
+            throw new MailSendException("SMTP test failed (MessagingException): " + e.getMessage(), e);
+
+        } catch (MailException e) {
+            String rootMsg = e.getMostSpecificCause() != null
+                             ? e.getMostSpecificCause().getMessage()
+                             : e.getMessage();
+            log.error("[EmailService] ✗ SMTP TEST: MailException — top={} root={}", e.getMessage(), rootMsg, e);
+            log.error("[EmailService]   FINAL VERDICT: ✗ Email rejected by Gmail. Reason: {}", rootMsg);
+            result.put("success", false);
+            result.put("verdict", "✗ Email rejected by Gmail. Reason: " + rootMsg);
+            result.put("message", rootMsg);
+            throw e;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Internal send helper
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Sends an HTML email.
+     * <ul>
+     *   <li>If mail is not configured, logs at WARN and returns — no exception.</li>
+     *   <li>If configured and SMTP fails, re-throws so the caller returns 502.</li>
+     * </ul>
+     *
+     * @throws MailException propagated on SMTP failure
+     */
+    private void send(String to, String subject, String html) {
+        if (!isMailConfigured()) {
+            log.warn("[EmailService] ✗ EmailService SKIPPING email — mail not configured.");
+            log.warn("[EmailService]   FINAL VERDICT: ✗ EmailService never executed (mail disabled/not configured).");
+            log.warn("[EmailService]   TO={} SUBJECT={}", to, subject);
+            return;
+        }
+
+        // ── Pre-send mandatory log ────────────────────────────────────────────
+        log.info("[EmailService] ── SENDING EMAIL ───────────────────────────────────");
+        log.info("[EmailService]   FROM    : {}", fromAddress);
+        log.info("[EmailService]   TO      : {}", to);
+        log.info("[EmailService]   SUBJECT : {}", subject);
+        log.info("[EmailService]   HOST    : {}", smtpHost);
+        log.info("[EmailService]   PORT    : {}", smtpPort);
+
+        try {
+            MimeMessage msg = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
+            helper.setFrom(fromAddress);
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(html, true);
+
+            log.info("[EmailService]   Invoking mailSender.send() — handing off to SMTP transport...");
+            mailSender.send(msg);
+
+            // ── Post-send confirmation ────────────────────────────────────────
+            log.info("[EmailService] ✓ SMTP ACCEPTED MESSAGE");
+            log.info("[EmailService]   Gmail accepted the message for delivery.");
+            log.info("[EmailService]   FINAL VERDICT: ✓ Email successfully accepted by Gmail SMTP.");
+            log.info("[EmailService]   to={} subject={}", to, subject);
+
+        } catch (jakarta.mail.MessagingException e) {
+            // MIME construction failure — bad address format, encoding error, etc.
+            log.error("[EmailService] ✗ MessagingException building MIME message.");
+            log.error("[EmailService]   SMTP error to={}: {}", to, e.getMessage(), e);
+            log.error("[EmailService]   FINAL VERDICT: ✗ Email rejected by Gmail. Reason: {}", e.getMessage());
+            // Wrap in MailSendException (MailException subclass) so controllers catch it
+            throw new MailSendException("Failed to build MIME message: " + e.getMessage(), e);
+
+        } catch (MailException e) {
+            // Transport failure — auth rejected, 5xx response, connection refused, etc.
+            String rootMsg = e.getMostSpecificCause() != null
+                             ? e.getMostSpecificCause().getMessage()
+                             : e.getMessage();
+            log.error("[EmailService] ✗ MailException / SMTP transport failure.");
+            log.error("[EmailService]   Top-level error : {}", e.getMessage());
+            log.error("[EmailService]   Root cause      : {}", rootMsg, e);
+            log.error("[EmailService]   FINAL VERDICT: ✗ Email rejected by Gmail. Reason: {}", rootMsg);
+            throw e;  // re-throw — controller returns HTTP 502
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -187,26 +513,11 @@ public class EmailService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Internal send helper
+    // Utilities
     // ─────────────────────────────────────────────────────────────────────────
 
-    private void send(String to, String subject, String html) {
-        if (!mailEnabled || fromAddress == null || fromAddress.isBlank()) {
-            log.info("[EmailService] Mail disabled — would have sent to={} subject={}", to, subject);
-            return;
-        }
-        try {
-            MimeMessage msg = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
-            helper.setFrom(fromAddress);
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(html, true);
-            mailSender.send(msg);
-            log.info("[EmailService] Sent email to={} subject={}", to, subject);
-        } catch (Exception e) {
-            log.error("[EmailService] Failed to send email to={}: {}", to, e.getMessage(), e);
-        }
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 
     private String escHtml(String s) {

@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mail.MailException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -164,26 +165,83 @@ public class GroupController {
     }
 
     @PostMapping("/{id}/invite")
-    @Operation(summary = "Invite a user member to a group by their registered email")
+    @Operation(summary = "Invite a user member to a group by email. Resends automatically if a pending invitation already exists.")
     public ResponseEntity<?> inviteMember(@PathVariable Long id, @Valid @RequestBody InviteMemberRequest request) {
         User user = getAuthenticatedUser();
         if (user == null) return unauthorized();
 
-        com.splitwisemoney.entity.GroupInvitation invitation = groupService.inviteMemberByEmail(id, request.getEmail(), user);
-        InvitationResponse response = new InvitationResponse(
-                invitation.getId(),
-                invitation.getGroup().getId(),
-                invitation.getGroup().getGroupName(),
-                invitation.getSender().getFullName(),
-                invitation.getStatus(),
-                invitation.getCreatedAt(),
-                invitation.getInvitationToken(),
-                invitation.getInviteeEmail(),
-                invitation.getExpiresAt(),
-                invitation.getAcceptedAt(),
-                invitation.getReceiver() == null
-        );
-        return ResponseEntity.ok(response);
+        try {
+            com.splitwisemoney.entity.GroupInvitation invitation = groupService.inviteMemberByEmail(id, request.getEmail(), user);
+            InvitationResponse response = new InvitationResponse(
+                    invitation.getId(),
+                    invitation.getGroup().getId(),
+                    invitation.getGroup().getGroupName(),
+                    invitation.getSender().getFullName(),
+                    invitation.getStatus(),
+                    invitation.getCreatedAt(),
+                    invitation.getInvitationToken(),
+                    invitation.getInviteeEmail(),
+                    invitation.getExpiresAt(),
+                    invitation.getAcceptedAt(),
+                    invitation.getReceiver() == null
+            );
+            return ResponseEntity.ok(response);
+        } catch (MailException e) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(java.util.Map.of(
+                            "message", "Invitation saved but email delivery failed: " + e.getMessage(),
+                            "smtpError", true
+                    ));
+        } catch (RuntimeException e) {
+            // Safety net: catches any unexpected exception from the mail pipeline
+            // (e.g. a wrapped MessagingException that escaped as RuntimeException).
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            if (msg.toLowerCase().contains("mail") || msg.toLowerCase().contains("smtp")
+                    || msg.toLowerCase().contains("message")) {
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                        .body(java.util.Map.of(
+                                "message", "Invitation saved but email delivery failed: " + msg,
+                                "smtpError", true
+                        ));
+            }
+            throw e;  // re-throw non-mail exceptions
+        }
+    }
+
+    @PostMapping("/{id}/invite/resend")
+    @Operation(summary = "Resend an existing pending invitation email")
+    public ResponseEntity<?> resendInvitation(@PathVariable Long id, @Valid @RequestBody InviteMemberRequest request) {
+        User user = getAuthenticatedUser();
+        if (user == null) return unauthorized();
+
+        try {
+            com.splitwisemoney.entity.GroupInvitation invitation = groupService.resendInvitation(id, request.getEmail(), user);
+            return ResponseEntity.ok(java.util.Map.of(
+                    "message", "Invitation email resent successfully to " + invitation.getInviteeEmail(),
+                    "token", invitation.getInvitationToken()
+            ));
+        } catch (MailException e) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(java.util.Map.of(
+                            "message", "Invitation found but email delivery failed: " + e.getMessage(),
+                            "smtpError", true
+                    ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(java.util.Map.of("message", e.getMessage()));
+        } catch (RuntimeException e) {
+            // Safety net: catches any unexpected exception from the mail pipeline.
+            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            if (msg.toLowerCase().contains("mail") || msg.toLowerCase().contains("smtp")
+                    || msg.toLowerCase().contains("message")) {
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                        .body(java.util.Map.of(
+                                "message", "Invitation found but email delivery failed: " + msg,
+                                "smtpError", true
+                        ));
+            }
+            throw e;  // re-throw non-mail exceptions
+        }
     }
 
     @GetMapping("/invitations")
