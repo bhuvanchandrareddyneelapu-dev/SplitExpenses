@@ -121,7 +121,7 @@ public class BrevoApiProvider implements EmailProvider {
             if (response.getStatusCode().is2xxSuccessful()) {
                 log.info("[BrevoApiProvider] ✓ Delivered via Brevo HTTP REST API (Status 200/201)");
             } else {
-                throw new MailSendException("Brevo API returned HTTP " + response.getStatusCodeValue() + ": " + response.getBody());
+                throw new MailSendException("Brevo API returned HTTP " + response.getStatusCode().value() + ": " + response.getBody());
             }
         } catch (Exception e) {
             log.error("[BrevoApiProvider] ✗ Brevo HTTP API dispatch failed: {}", e.getMessage(), e);

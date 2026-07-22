@@ -39,8 +39,8 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Public front-end static files
-                .requestMatchers("/", "/*.html", "/css/**", "/js/**", "/favicon.ico").permitAll()
+                // Public front-end static files & routes
+                .requestMatchers("/", "/*.html", "/css/**", "/js/**", "/favicon.ico", "/signup", "/invitations/accept/**").permitAll()
                 // Auth APIs (login, register)
                 .requestMatchers("/api/auth/**").permitAll()
                 // Public Group Invitations

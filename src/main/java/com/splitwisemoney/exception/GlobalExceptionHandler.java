@@ -65,6 +65,26 @@ public class GlobalExceptionHandler {
     }
 
     // ──────────────────────────────────────────
+    // 409 Conflict
+    // ──────────────────────────────────────────
+
+    @ExceptionHandler(ResourceConflictException.class)
+    public ResponseEntity<Object> handleResourceConflictException(ResourceConflictException ex, WebRequest request) {
+        log.warn("Conflict [{}]: {}", request.getDescription(false), ex.getMessage());
+        return errorBody(HttpStatus.CONFLICT, "Conflict", ex.getMessage());
+    }
+
+    // ──────────────────────────────────────────
+    // 410 Gone
+    // ──────────────────────────────────────────
+
+    @ExceptionHandler({InvitationExpiredException.class, InvalidTokenException.class})
+    public ResponseEntity<Object> handleInvitationExpiredOrInvalid(RuntimeException ex, WebRequest request) {
+        log.warn("Invitation expired or invalid [{}]: {}", request.getDescription(false), ex.getMessage());
+        return errorBody(HttpStatus.GONE, "Gone", ex.getMessage());
+    }
+
+    // ──────────────────────────────────────────
     // 403 Forbidden
     // ──────────────────────────────────────────
 
@@ -77,6 +97,12 @@ public class GlobalExceptionHandler {
     // ──────────────────────────────────────────
     // 500 Internal Server Error
     // ──────────────────────────────────────────
+
+    @ExceptionHandler(SmtpDeliveryException.class)
+    public ResponseEntity<Object> handleSmtpDeliveryException(SmtpDeliveryException ex, WebRequest request) {
+        log.error("SMTP Delivery Error [{}]: {}", request.getDescription(false), ex.getMessage(), ex);
+        return errorBody(HttpStatus.INTERNAL_SERVER_ERROR, "SMTP Delivery Error", ex.getMessage());
+    }
 
     /**
      * LazyInitializationException means a JPA entity's lazy-loaded association was

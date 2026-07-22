@@ -118,7 +118,7 @@ public class SendGridApiProvider implements EmailProvider {
             if (response.getStatusCode().is2xxSuccessful()) {
                 log.info("[SendGridApiProvider] ✓ Delivered via SendGrid HTTP REST API");
             } else {
-                throw new MailSendException("SendGrid API returned HTTP " + response.getStatusCodeValue() + ": " + response.getBody());
+                throw new MailSendException("SendGrid API returned HTTP " + response.getStatusCode().value() + ": " + response.getBody());
             }
         } catch (Exception e) {
             log.error("[SendGridApiProvider] ✗ SendGrid HTTP API dispatch failed: {}", e.getMessage(), e);

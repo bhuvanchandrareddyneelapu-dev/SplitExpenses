@@ -117,7 +117,7 @@ public class ResendApiProvider implements EmailProvider {
             if (response.getStatusCode().is2xxSuccessful()) {
                 log.info("[ResendApiProvider] ✓ Delivered via Resend HTTP REST API");
             } else {
-                throw new MailSendException("Resend API returned HTTP " + response.getStatusCodeValue() + ": " + response.getBody());
+                throw new MailSendException("Resend API returned HTTP " + response.getStatusCode().value() + ": " + response.getBody());
             }
         } catch (Exception e) {
             log.error("[ResendApiProvider] ✗ Resend HTTP API dispatch failed: {}", e.getMessage(), e);

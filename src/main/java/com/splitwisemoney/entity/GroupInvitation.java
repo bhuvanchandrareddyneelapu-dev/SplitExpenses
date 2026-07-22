@@ -72,7 +72,7 @@ public class GroupInvitation {
             status = "PENDING";
         }
         if (expiresAt == null) {
-            expiresAt = LocalDateTime.now().plusDays(7);
+            expiresAt = LocalDateTime.now().plusHours(48);
         }
         if (emailDeliveryStatus == null) {
             emailDeliveryStatus = "PENDING";
@@ -148,5 +148,21 @@ public class GroupInvitation {
 
     public LocalDateTime getEmailLastAttemptAt() { return emailLastAttemptAt; }
     public void setEmailLastAttemptAt(LocalDateTime emailLastAttemptAt) { this.emailLastAttemptAt = emailLastAttemptAt; }
+
+    // --- Invitation Field Compatibility Aliases ---
+    public String getToken() { return invitationToken; }
+    public void setToken(String token) { this.invitationToken = token; }
+
+    public String getEmail() { return inviteeEmail; }
+    public void setEmail(String email) { this.inviteeEmail = email; }
+
+    public User getInvitedBy() { return sender; }
+    public void setInvitedBy(User invitedBy) { this.sender = invitedBy; }
+
+    public User getRegisteredUser() { return receiver; }
+    public void setRegisteredUser(User registeredUser) { this.receiver = registeredUser; }
+
+    public LocalDateTime getExpiryTime() { return expiresAt; }
+    public void setExpiryTime(LocalDateTime expiryTime) { this.expiresAt = expiryTime; }
 }
 

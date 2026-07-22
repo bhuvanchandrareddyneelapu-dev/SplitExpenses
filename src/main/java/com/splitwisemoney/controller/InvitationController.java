@@ -1,5 +1,7 @@
 package com.splitwisemoney.controller;
 
+import com.splitwisemoney.exception.InvitationExpiredException;
+
 import com.splitwisemoney.dto.InviteDetailResponse;
 import com.splitwisemoney.entity.GroupInvitation;
 import com.splitwisemoney.entity.User;
@@ -48,29 +50,22 @@ public class InvitationController {
     @GetMapping("/{token}")
     @Operation(summary = "Get public details of a group invitation by token")
     public ResponseEntity<?> getInvitationDetails(@PathVariable String token) {
-        try {
-            GroupInvitation invitation = groupService.getInvitationByToken(token);
-            
-            // Check expiry and update status
-            if (invitation.isExpired() && "PENDING".equals(invitation.getStatus())) {
-                invitation.setStatus("EXPIRED");
-            }
-
-            int memberCount = groupService.getGroupMembers(invitation.getGroup().getId()).size();
-
-            InviteDetailResponse response = new InviteDetailResponse(
-                    invitation.getGroup().getGroupName(),
-                    memberCount,
-                    invitation.getSender().getFullName(),
-                    invitation.getInviteeEmail(),
-                    invitation.getStatus(),
-                    invitation.getExpiresAt()
-            );
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(java.util.Map.of("message", e.getMessage()));
+        GroupInvitation invitation = groupService.getInvitationByToken(token);
+        if (invitation.isExpired() || "EXPIRED".equals(invitation.getStatus())) {
+            throw new InvitationExpiredException("This invitation link has expired.");
         }
+
+        int memberCount = groupService.getGroupMembers(invitation.getGroup().getId()).size();
+
+        InviteDetailResponse response = new InviteDetailResponse(
+                invitation.getGroup().getGroupName(),
+                memberCount,
+                invitation.getSender().getFullName(),
+                invitation.getInviteeEmail(),
+                invitation.getStatus(),
+                invitation.getExpiresAt()
+        );
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{token}/accept")
@@ -80,13 +75,8 @@ public class InvitationController {
         User user = getAuthenticatedUser();
         if (user == null) return unauthorized();
 
-        try {
-            groupService.acceptInvitationByToken(token, user);
-            return ResponseEntity.ok(java.util.Map.of("message", "Invitation accepted successfully"));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(java.util.Map.of("message", e.getMessage()));
-        }
+        groupService.acceptInvitationByToken(token, user);
+        return ResponseEntity.ok(java.util.Map.of("message", "Invitation accepted successfully"));
     }
 
     @PostMapping("/{token}/reject")
@@ -96,12 +86,7 @@ public class InvitationController {
         User user = getAuthenticatedUser();
         if (user == null) return unauthorized();
 
-        try {
-            groupService.rejectInvitationByToken(token, user);
-            return ResponseEntity.ok(java.util.Map.of("message", "Invitation rejected successfully"));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(java.util.Map.of("message", e.getMessage()));
-        }
+        groupService.rejectInvitationByToken(token, user);
+        return ResponseEntity.ok(java.util.Map.of("message", "Invitation rejected successfully"));
     }
 }

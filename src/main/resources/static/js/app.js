@@ -335,51 +335,55 @@ const App = {
                 const email = document.getElementById('newMemberEmail').value;
                 const alertArea = document.getElementById('groupAlertArea');
                 const btnSubmit = addMemberForm.querySelector('button[type="submit"]');
-                const origText = btnSubmit ? btnSubmit.innerHTML : 'Invite';
+                const origText = btnSubmit ? btnSubmit.innerHTML : '<i class="fa-solid fa-user-plus"></i>';
 
-                if (alertArea) alertArea.classList.add('d-none');
-                if (btnSubmit) {
-                    btnSubmit.disabled = true;
-                    btnSubmit.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin me-2"></i>Sending...';
-                }
-
-                try {
-                    const response = await API.post(`/api/groups/${groupId}/invite`, { email });
-                    document.getElementById('newMemberEmail').value = '';
-
-                    let msg = 'Invitation sent successfully!';
-                    if (response && response.newUser) {
-                        msg = 'User not registered (invitation sent, account will be created after signup)';
-                    }
-
-                    if (alertArea) {
-                        alertArea.textContent = msg;
-                        alertArea.className = 'alert border-0 text-white d-block';
-                        alertArea.style.backgroundColor = 'var(--accent-emerald)';
-                    }
-
-                    this.loadGroupMembers(groupId);
-                    this.loadGroupSettlements(groupId);
-
-                    setTimeout(() => { if (alertArea) alertArea.classList.add('d-none'); }, 5000);
-                } catch (err) {
-                    let msg = err.message || 'Failed to add member.';
-                    if (msg.includes('already a member')) {
-                        msg = 'Already member: ' + msg;
-                    } else if (msg.includes('already pending') || msg.includes('already been invited')) {
-                        msg = 'Already invited: ' + msg;
-                    }
-                    if (alertArea) {
-                        alertArea.textContent = msg;
-                        alertArea.className = 'alert border-0 text-white d-block';
-                        alertArea.style.backgroundColor = 'var(--accent-rose)';
-                    }
-                } finally {
+                const sendInvite = async () => {
+                    if (alertArea) alertArea.classList.add('d-none');
                     if (btnSubmit) {
-                        btnSubmit.disabled = false;
-                        btnSubmit.innerHTML = origText;
+                        btnSubmit.disabled = true;
+                        btnSubmit.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin me-2"></i>Sending...';
                     }
-                }
+
+                    try {
+                        await API.post(`/api/groups/${groupId}/members`, { email });
+                        document.getElementById('newMemberEmail').value = '';
+
+                        if (alertArea) {
+                            alertArea.innerHTML = '<i class="fa-solid fa-circle-check me-2"></i>Invitation email sent successfully.';
+                            alertArea.className = 'alert border-0 text-white d-block';
+                            alertArea.style.backgroundColor = 'var(--accent-emerald)';
+                        }
+
+                        App.loadGroupMembers(groupId);
+                        App.loadGroupSettlements(groupId);
+
+                        setTimeout(() => { if (alertArea) alertArea.classList.add('d-none'); }, 5000);
+                    } catch (err) {
+                        let msg = err.message || 'Unable to send invitation.';
+                        if (alertArea) {
+                            alertArea.innerHTML = `
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <span><i class="fa-solid fa-triangle-exclamation me-2"></i>${msg}</span>
+                                    <button class="btn btn-sm btn-light py-0 ms-2 fw-semibold" id="btnRetryInvite">Retry</button>
+                                </div>
+                            `;
+                            alertArea.className = 'alert border-0 text-white d-block';
+                            alertArea.style.backgroundColor = 'var(--accent-rose)';
+
+                            const retryBtn = document.getElementById('btnRetryInvite');
+                            if (retryBtn) {
+                                retryBtn.addEventListener('click', sendInvite);
+                            }
+                        }
+                    } finally {
+                        if (btnSubmit) {
+                            btnSubmit.disabled = false;
+                            btnSubmit.innerHTML = origText;
+                        }
+                    }
+                };
+
+                await sendInvite();
             });
         }
 

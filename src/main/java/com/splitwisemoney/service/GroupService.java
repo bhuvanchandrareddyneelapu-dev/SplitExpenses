@@ -21,6 +21,12 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.splitwisemoney.exception.InvalidTokenException;
+import com.splitwisemoney.exception.InvitationExpiredException;
+import com.splitwisemoney.exception.ResourceConflictException;
+import com.splitwisemoney.service.email.InvitationTokenService;
+import com.splitwisemoney.service.email.JavaMailEmailService;
+
 @Service
 public class GroupService {
 
@@ -33,6 +39,8 @@ public class GroupService {
     private final ActivityLogService activityLogService;
     private final NotificationService notificationService;
     private final EmailService emailService;
+    private final InvitationTokenService invitationTokenService;
+    private final JavaMailEmailService javaMailEmailService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -43,7 +51,9 @@ public class GroupService {
                         GroupInvitationRepository groupInvitationRepository,
                         ActivityLogService activityLogService,
                         NotificationService notificationService,
-                        EmailService emailService) {
+                        EmailService emailService,
+                        InvitationTokenService invitationTokenService,
+                        JavaMailEmailService javaMailEmailService) {
         this.groupRepository = groupRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.userRepository = userRepository;
@@ -51,6 +61,8 @@ public class GroupService {
         this.activityLogService = activityLogService;
         this.notificationService = notificationService;
         this.emailService = emailService;
+        this.invitationTokenService = invitationTokenService;
+        this.javaMailEmailService = javaMailEmailService;
     }
 
     @Transactional
@@ -99,6 +111,8 @@ public class GroupService {
 
     @Transactional
     public GroupMember addMemberByEmail(Long groupId, String email, User actor) {
+        validateEmailFormat(email);
+
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new IllegalArgumentException("Group not found"));
 
@@ -106,20 +120,40 @@ public class GroupService {
             throw new IllegalArgumentException("Only group members can add members to the group.");
         }
 
-        User userToAdd = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("User with email " + email + " does not exist"));
+        Optional<User> existingUser = userRepository.findByEmail(email);
 
-        if (groupMemberRepository.existsByGroupIdAndUserId(groupId, userToAdd.getId())) {
-            throw new IllegalArgumentException("User is already a member of this group");
+        if (existingUser.isPresent()) {
+            User userToAdd = existingUser.get();
+            if (groupMemberRepository.existsByGroupIdAndUserId(groupId, userToAdd.getId())) {
+                throw new ResourceConflictException("User is already a member of this group");
+            }
+
+            Optional<GroupInvitation> existingInv = groupInvitationRepository.findByGroupIdAndInviteeEmail(groupId, email);
+            if (existingInv.isPresent() && "PENDING".equals(existingInv.get().getStatus()) && !existingInv.get().isExpired()) {
+                throw new ResourceConflictException("An invitation is already pending for this email");
+            }
+
+            // Create GroupMember record & GroupInvitation
+            GroupMember groupMember = new GroupMember(group, userToAdd);
+            GroupMember saved = groupMemberRepository.save(groupMember);
+
+            GroupInvitation invitation = createAndSaveInvitation(group, actor, userToAdd, email);
+            javaMailEmailService.sendRegisteredUserInvitation(invitation, actor.getFullName(), group.getGroupName());
+
+            activityLogService.log(actor, "Added " + userToAdd.getFullName() + " to group " + group.getGroupName());
+            notificationService.createNotification(userToAdd, "GROUP_INVITE", actor.getFullName() + " added you to the group " + group.getGroupName());
+
+            return saved;
+        } else {
+            Optional<GroupInvitation> existingInv = groupInvitationRepository.findByGroupIdAndInviteeEmail(groupId, email);
+            if (existingInv.isPresent() && "PENDING".equals(existingInv.get().getStatus()) && !existingInv.get().isExpired()) {
+                throw new ResourceConflictException("An invitation is already pending for this email");
+            }
+
+            GroupInvitation invitation = createAndSaveInvitation(group, actor, null, email);
+            javaMailEmailService.sendUnregisteredUserInvitation(invitation, actor.getFullName(), group.getGroupName());
+            return null;
         }
-
-        GroupMember groupMember = new GroupMember(group, userToAdd);
-        GroupMember saved = groupMemberRepository.save(groupMember);
-
-        activityLogService.log(actor, "Added " + userToAdd.getFullName() + " to group " + group.getGroupName());
-        notificationService.createNotification(userToAdd, "GROUP_INVITE", actor.getFullName() + " added you to the group " + group.getGroupName());
-
-        return saved;
     }
 
     @Transactional
@@ -186,6 +220,8 @@ public class GroupService {
      */
     @Transactional
     public GroupInvitation inviteMemberByEmail(Long groupId, String email, User actor) {
+        validateEmailFormat(email);
+
         log.info("[GroupService] Entering inviteMemberByEmail() — groupId={}, inviteeEmail={}, actor={}",
                  groupId, email, actor.getEmail());
 
@@ -196,49 +232,40 @@ public class GroupService {
             throw new IllegalArgumentException("Only group members can invite others to the group.");
         }
 
-        // Prevent inviting actor themselves
         if (actor.getEmail().equalsIgnoreCase(email)) {
             throw new IllegalArgumentException("You cannot invite yourself.");
         }
 
         Optional<User> existingUser = userRepository.findByEmail(email);
-        log.info("[GroupService]   Invitee is registered user: {}", existingUser.isPresent());
 
-        // Prevent inviting an existing group member
         existingUser.ifPresent(u -> {
             if (groupMemberRepository.existsByGroupIdAndUserId(groupId, u.getId())) {
-                throw new IllegalArgumentException("This user is already a member of the group.");
+                throw new ResourceConflictException("User is already a member of this group");
             }
         });
 
-        // Check for existing invitation by email
         Optional<GroupInvitation> existing = groupInvitationRepository.findByGroupIdAndInviteeEmail(groupId, email);
         if (existing.isPresent()) {
             GroupInvitation inv = existing.get();
-            log.info("[GroupService]   Existing invitation found — status={}, expired={}",
-                     inv.getStatus(), inv.isExpired());
             if ("PENDING".equals(inv.getStatus()) && !inv.isExpired()) {
-                // Still pending — resend the email rather than blocking the request
-                log.info("[GroupService]   Resending email for existing PENDING invitation id={}", inv.getId());
                 sendInvitationEmails(inv, actor, group, existingUser);
                 return inv;
             }
-            // Expired, rejected, or accepted — reset and re-invite
-            String newToken = UUID.randomUUID().toString();
+
+            String newToken = invitationTokenService.generateToken();
             inv.setStatus("PENDING");
             inv.setSender(actor);
             inv.setRespondedAt(null);
             inv.setInvitationToken(newToken);
-            inv.setExpiresAt(LocalDateTime.now().plusDays(7));
+            inv.setExpiresAt(invitationTokenService.calculateExpiryTime());
             existingUser.ifPresent(inv::setReceiver);
             GroupInvitation saved = groupInvitationRepository.save(inv);
-            log.info("[GroupService]   Invitation reset and saved. id={} token={}", saved.getId(), newToken);
+            entityManager.flush();
             sendInvitationEmails(saved, actor, group, existingUser);
             return saved;
         }
 
-        // Brand new invitation
-        String token = UUID.randomUUID().toString();
+        String token = invitationTokenService.generateToken();
         GroupInvitation invitation;
         if (existingUser.isPresent()) {
             invitation = new GroupInvitation(group, actor, existingUser.get());
@@ -246,38 +273,49 @@ public class GroupService {
             invitation = new GroupInvitation(group, actor, email);
         }
         invitation.setInvitationToken(token);
+        invitation.setExpiresAt(invitationTokenService.calculateExpiryTime());
 
         GroupInvitation saved = groupInvitationRepository.save(invitation);
-        log.info("[GroupService]   Invitation saved. id={} status={} inviteeEmail={} token={}",
-                 saved.getId(), saved.getStatus(), saved.getInviteeEmail(), token);
-
-        // Flush to ensure DB record exists before the email is sent
         entityManager.flush();
-        log.info("[GroupService]   DB flush complete. Calling EmailService.send*Invitation()...");
         sendInvitationEmails(saved, actor, group, existingUser);
-        log.info("[GroupService]   Returned from EmailService. inviteMemberByEmail() complete.");
         return saved;
     }
 
+    public GroupInvitation createAndSaveInvitation(Group group, User actor, User targetUser, String email) {
+        String token = invitationTokenService.generateToken();
+        GroupInvitation invitation;
+        if (targetUser != null) {
+            invitation = new GroupInvitation(group, actor, targetUser);
+        } else {
+            invitation = new GroupInvitation(group, actor, email);
+        }
+        invitation.setInvitationToken(token);
+        invitation.setExpiresAt(invitationTokenService.calculateExpiryTime());
+        GroupInvitation saved = groupInvitationRepository.save(invitation);
+        entityManager.flush();
+        return saved;
+    }
+
+    private void validateEmailFormat(String email) {
+        if (email == null || email.isBlank() || !email.contains("@") || !email.contains(".")) {
+            throw new IllegalArgumentException("Invalid email format");
+        }
+    }
+
     private void sendInvitationEmails(GroupInvitation inv, User actor, Group group, Optional<User> existingUser) {
-        log.info("[GroupService] Calling EmailService.send*Invitation() — inviteeEmail={} existingUser={}",
+        log.info("[GroupService] Calling JavaMailEmailService — inviteeEmail={} existingUser={}",
                  inv.getInviteeEmail(), existingUser.isPresent());
 
         if (existingUser.isPresent()) {
-            // Existing user: email + in-app notification
-            log.info("[GroupService]   Sending existing-user invitation email to={}", inv.getInviteeEmail());
-            emailService.sendExistingUserInvitation(inv, actor.getFullName(), group.getGroupName());
+            javaMailEmailService.sendRegisteredUserInvitation(inv, actor.getFullName(), group.getGroupName());
             notificationService.createNotification(
                     existingUser.get(),
                     "GROUP_INVITE",
                     actor.getFullName() + " invited you to join the group \"" + group.getGroupName() + "\". Click to view.");
         } else {
-            // New user: registration link email
-            log.info("[GroupService]   Sending new-user registration email to={}", inv.getInviteeEmail());
-            emailService.sendNewUserInvitation(inv, actor.getFullName(), group.getGroupName());
+            javaMailEmailService.sendUnregisteredUserInvitation(inv, actor.getFullName(), group.getGroupName());
         }
         activityLogService.log(actor, "Invited " + inv.getInviteeEmail() + " to join " + group.getGroupName());
-        log.info("[GroupService] sendInvitationEmails() complete for inviteeEmail={}", inv.getInviteeEmail());
     }
 
 
@@ -327,16 +365,21 @@ public class GroupService {
      * Returns invitation details for a given token (used by the frontend invite page).
      * Does not require the user to be the receiver — they just need to be logged in.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public GroupInvitation getInvitationByToken(String token) {
-        return groupInvitationRepository.findByInvitationToken(token)
-                .orElseThrow(() -> new IllegalArgumentException("Invitation not found or invalid token."));
+        GroupInvitation invitation = groupInvitationRepository.findByInvitationToken(token)
+                .orElseThrow(() -> new InvalidTokenException("Invitation not found or invalid token."));
+        if (invitation.isExpired() && "PENDING".equals(invitation.getStatus())) {
+            invitation.setStatus("EXPIRED");
+            groupInvitationRepository.save(invitation);
+        }
+        return invitation;
     }
 
     @Transactional
     public void acceptInvitationByToken(String token, User user) {
         GroupInvitation invitation = groupInvitationRepository.findByInvitationToken(token)
-                .orElseThrow(() -> new IllegalArgumentException("Invitation not found or invalid token."));
+                .orElseThrow(() -> new InvalidTokenException("Invitation not found or invalid token."));
 
         validatePendingInvitation(invitation);
         validateInviteeEmail(invitation, user);
@@ -362,7 +405,7 @@ public class GroupService {
     @Transactional
     public void rejectInvitationByToken(String token, User user) {
         GroupInvitation invitation = groupInvitationRepository.findByInvitationToken(token)
-                .orElseThrow(() -> new IllegalArgumentException("Invitation not found or invalid token."));
+                .orElseThrow(() -> new InvalidTokenException("Invitation not found or invalid token."));
 
         validatePendingInvitation(invitation);
         validateInviteeEmail(invitation, user);
@@ -386,7 +429,7 @@ public class GroupService {
     @Transactional
     public void acceptInvitation(Long invitationId, User user) {
         GroupInvitation invitation = groupInvitationRepository.findById(invitationId)
-                .orElseThrow(() -> new IllegalArgumentException("Invitation not found"));
+                .orElseThrow(() -> new InvalidTokenException("Invitation not found"));
 
         if (invitation.getReceiver() != null && !invitation.getReceiver().getId().equals(user.getId())) {
             throw new IllegalArgumentException("You are not the recipient of this invitation");
@@ -410,7 +453,7 @@ public class GroupService {
     @Transactional
     public void rejectInvitation(Long invitationId, User user) {
         GroupInvitation invitation = groupInvitationRepository.findById(invitationId)
-                .orElseThrow(() -> new IllegalArgumentException("Invitation not found"));
+                .orElseThrow(() -> new InvalidTokenException("Invitation not found"));
 
         if (invitation.getReceiver() != null && !invitation.getReceiver().getId().equals(user.getId())) {
             throw new IllegalArgumentException("You are not the recipient of this invitation");
@@ -432,12 +475,12 @@ public class GroupService {
 
     private void validatePendingInvitation(GroupInvitation inv) {
         if (!"PENDING".equals(inv.getStatus())) {
-            throw new IllegalArgumentException("This invitation has already been " + inv.getStatus().toLowerCase() + ".");
+            throw new InvitationExpiredException("This invitation has already been " + inv.getStatus().toLowerCase() + ".");
         }
         if (inv.isExpired()) {
             inv.setStatus("EXPIRED");
             groupInvitationRepository.save(inv);
-            throw new IllegalArgumentException("This invitation has expired.");
+            throw new InvitationExpiredException("This invitation has expired.");
         }
     }
 

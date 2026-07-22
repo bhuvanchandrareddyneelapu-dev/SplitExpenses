@@ -1,6 +1,5 @@
 package com.splitwisemoney.service.provider;
 
-import com.splitwisemoney.service.SmtpDiagnosticService;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +31,6 @@ public class GmailSmtpProvider implements EmailProvider {
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a");
 
     private final JavaMailSender mailSender;
-    private final SmtpDiagnosticService smtpDiagnosticService;
 
     @Value("${spring.mail.host:smtp.gmail.com}")
     private String smtpHost;
@@ -52,9 +50,8 @@ public class GmailSmtpProvider implements EmailProvider {
     @Value("${app.base-url:http://localhost:8080}")
     private String baseUrl;
 
-    public GmailSmtpProvider(JavaMailSender mailSender, SmtpDiagnosticService smtpDiagnosticService) {
+    public GmailSmtpProvider(JavaMailSender mailSender) {
         this.mailSender = mailSender;
-        this.smtpDiagnosticService = smtpDiagnosticService;
     }
 
     @Override
