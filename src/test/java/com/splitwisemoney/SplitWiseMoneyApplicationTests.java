@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.splitwisemoney.entity.GroupInvitation;
+import com.splitwisemoney.exception.ResourceConflictException;
 import com.splitwisemoney.repository.GroupInvitationRepository;
 import java.time.LocalDateTime;
 
@@ -48,6 +49,9 @@ class SplitWiseMoneyApplicationTests {
 
     @Autowired
     private DashboardService dashboardService;
+
+    @org.springframework.test.context.bean.override.mockito.MockitoBean(name = "compositeFallbackEmailProvider")
+    private com.splitwisemoney.service.provider.EmailProvider mockEmailProvider;
 
     @Test
     void testSettlementSimplificationMath() {
@@ -324,12 +328,10 @@ class SplitWiseMoneyApplicationTests {
         org.junit.jupiter.api.Assertions.assertEquals("PENDING", existingInv.getStatus());
         org.junit.jupiter.api.Assertions.assertEquals(existingUser.getId(), existingInv.getReceiver().getId());
         
-        // 3. Duplicate invitation — GroupService resends the email instead of throwing.
-        // The same invitation record is returned with its status still PENDING.
-        GroupInvitation resent = groupService.inviteMemberByEmail(group.getId(), "existing@test.com", inviter);
-        org.junit.jupiter.api.Assertions.assertEquals(existingInv.getId(), resent.getId(),
-                "Duplicate invite should return the same invitation record (resend path)");
-        org.junit.jupiter.api.Assertions.assertEquals("PENDING", resent.getStatus());
+        // 3. Duplicate invitation — GroupService throws ResourceConflictException (409 Conflict) per ISSUE 8
+        org.junit.jupiter.api.Assertions.assertThrows(ResourceConflictException.class, () -> {
+            groupService.inviteMemberByEmail(group.getId(), "existing@test.com", inviter);
+        });
 
         // 4. Accept invitation via token
         groupService.acceptInvitationByToken(existingInv.getInvitationToken(), existingUser);

@@ -65,21 +65,34 @@
     <!-- Frontend API Connection -->
     <script src="js/api.js"></script>
     <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const inviteToken = urlParams.get('invitationToken') || urlParams.get('invite');
+            const emailParam = urlParams.get('email');
+            if (emailParam) {
+                const emailInput = document.getElementById('email');
+                if (emailInput) emailInput.value = emailParam;
+            }
+        });
+
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const alertArea = document.getElementById('alertArea');
             
+            const urlParams = new URLSearchParams(window.location.search);
+            const inviteToken = urlParams.get('invitationToken') || urlParams.get('invite');
+
             alertArea.classList.add('d-none');
             
             try {
-                const response = await API.post('/api/auth/login', { email, password }, false);
+                const response = await API.post('/api/auth/login', { email, password, invitationToken: inviteToken }, false);
                 if (response.token) {
                     API.setToken(response.token);
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const inviteToken = urlParams.get('invitationToken');
-                    if (inviteToken) {
+                    if (response.acceptedGroupId) {
+                        window.location.href = 'group-details.html?id=' + response.acceptedGroupId;
+                    } else if (inviteToken) {
                         window.location.href = 'invite.html?token=' + inviteToken;
                     } else {
                         window.location.href = 'dashboard.html';

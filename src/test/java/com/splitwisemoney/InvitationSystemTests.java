@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,13 +47,19 @@ class InvitationSystemTests {
     @Autowired
     private InvitationScheduler invitationScheduler;
 
+    @Autowired
+    private com.splitwisemoney.service.provider.GmailSmtpProvider gmailSmtpProvider;
+
+    @Value("${app.frontend-url:${app.base-url:http://localhost:8080}}")
+    private String configuredFrontendUrl;
+
     private User owner;
     private User registeredUser;
     private Group group;
 
     @BeforeEach
     void setUp() {
-        owner = userService.registerUser("Bhuvan", "bhuvan" + System.currentTimeMillis() + "@test.com", "Password@123");
+        owner = userService.registerUser("Bhuvan", "bhuvan" + System.currentTimeMillis() + "@gmail.com", "Password@123");
         registeredUser = userService.registerUser("Ramsita", "ramsita" + System.currentTimeMillis() + "@gmail.com", "Password@123");
         group = groupService.createGroup("Observation", owner);
     }
@@ -64,6 +71,7 @@ class InvitationSystemTests {
 
         assertNotNull(inv);
         assertNotNull(inv.getInvitationToken());
+        assertNotNull(inv.getTokenHash());
         assertEquals("PENDING", inv.getStatus());
         assertEquals(registeredUser.getEmail(), inv.getInviteeEmail());
         assertNotNull(inv.getReceiver());
@@ -133,7 +141,7 @@ class InvitationSystemTests {
     @Test
     @DisplayName("Duplicate Pending Invitation throws ResourceConflictException (HTTP 409)")
     void testDuplicatePendingInvitationThrows409() {
-        String testEmail = "unreg_dup" + System.currentTimeMillis() + "@test.com";
+        String testEmail = "unreg_dup" + System.currentTimeMillis() + "@gmail.com";
         groupService.addMemberByEmail(group.getId(), testEmail, owner);
 
         assertThrows(ResourceConflictException.class, () -> {
@@ -161,6 +169,14 @@ class InvitationSystemTests {
     }
 
     @Test
+    @DisplayName("Disallowed / Bounce-Prone Domain throws IllegalArgumentException (HTTP 400)")
+    void testDisallowedBounceDomainRejection() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            groupService.inviteMemberByEmail(group.getId(), "expired@invalid.com", owner);
+        });
+    }
+
+    @Test
     @DisplayName("Token Tampering / Invalid Token throws InvalidTokenException (HTTP 410)")
     void testInvalidTokenThrows410() {
         assertThrows(InvalidTokenException.class, () -> {
@@ -183,14 +199,39 @@ class InvitationSystemTests {
     }
 
     @Test
-    @DisplayName("Secure Token Generation uses UUID and SecureRandom with 48h expiry")
+    @DisplayName("Secure Token Generation uses 256-bit SecureRandom and SHA-256 Hashing with 48h expiry")
     void testTokenGenerationAndExpiry() {
         String token = invitationTokenService.generateToken();
         assertNotNull(token);
-        assertEquals(36, token.length());
+        assertEquals(64, token.length());
+
+        String hash = invitationTokenService.hashToken(token);
+        assertNotNull(hash);
+        assertEquals(64, hash.length());
 
         LocalDateTime expiry = invitationTokenService.calculateExpiryTime();
         assertTrue(expiry.isAfter(LocalDateTime.now().plusHours(47)));
         assertTrue(expiry.isBefore(LocalDateTime.now().plusHours(49)));
+    }
+
+    @Test
+    @DisplayName("Verify Real Gmail SMTP Email Delivery to ramsita71789@gmail.com")
+    void testRealGmailDelivery() {
+        assertDoesNotThrow(() -> {
+            gmailSmtpProvider.sendExistingUserInvitation(
+                    "ramsita71789@gmail.com",
+                    "Bhuvan",
+                    "Observation",
+                    "test-real-token-" + System.currentTimeMillis(),
+                    LocalDateTime.now().plusHours(48)
+            );
+        });
+    }
+
+    @Test
+    @DisplayName("Verify Configured app.frontend-url Property Resolution")
+    void testFrontendUrlConfiguration() {
+        assertNotNull(configuredFrontendUrl);
+        assertFalse(configuredFrontendUrl.isBlank());
     }
 }

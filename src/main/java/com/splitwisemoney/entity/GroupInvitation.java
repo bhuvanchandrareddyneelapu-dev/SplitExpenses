@@ -15,8 +15,11 @@ public class GroupInvitation {
      * Secure random UUID token for token-based accept/reject links.
      * Also used in email invite links.
      */
-    @Column(name = "invitation_token", unique = true, length = 36)
+    @Column(name = "invitation_token", unique = true, length = 64)
     private String invitationToken;
+
+    @Column(name = "token_hash", length = 64)
+    private String tokenHash;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "group_id", nullable = false)
@@ -164,5 +167,8 @@ public class GroupInvitation {
 
     public LocalDateTime getExpiryTime() { return expiresAt; }
     public void setExpiryTime(LocalDateTime expiryTime) { this.expiresAt = expiryTime; }
+
+    public String getTokenHash() { return tokenHash; }
+    public void setTokenHash(String tokenHash) { this.tokenHash = tokenHash; }
 }
 

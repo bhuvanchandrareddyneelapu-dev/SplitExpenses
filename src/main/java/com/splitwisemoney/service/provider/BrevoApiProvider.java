@@ -28,6 +28,7 @@ public class BrevoApiProvider implements EmailProvider {
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a");
 
     private final RestTemplate restTemplate;
+    private final com.splitwisemoney.config.FrontendUrlResolver frontendUrlResolver;
 
     @Value("${brevo.api-key:${BREVO_API_KEY:}}")
     private String apiKey;
@@ -35,11 +36,9 @@ public class BrevoApiProvider implements EmailProvider {
     @Value("${spring.mail.username:${MAIL_USERNAME:}}")
     private String senderEmail;
 
-    @Value("${app.base-url:http://localhost:8080}")
-    private String baseUrl;
-
-    public BrevoApiProvider() {
+    public BrevoApiProvider(com.splitwisemoney.config.FrontendUrlResolver frontendUrlResolver) {
         this.restTemplate = new RestTemplate();
+        this.frontendUrlResolver = frontendUrlResolver;
     }
 
     @Override
@@ -55,6 +54,7 @@ public class BrevoApiProvider implements EmailProvider {
 
     @Override
     public void sendExistingUserInvitation(String toEmail, String inviterName, String groupName, String token, LocalDateTime expiresAt) {
+        String baseUrl = frontendUrlResolver.getBaseUrl();
         String subject = inviterName + " invited you to join \"" + groupName + "\" on SplitWiseMoney";
         String acceptUrl = baseUrl + "/invite.html?token=" + token;
         String rejectUrl = baseUrl + "/api/invitations/" + token + "/reject";
@@ -66,8 +66,9 @@ public class BrevoApiProvider implements EmailProvider {
 
     @Override
     public void sendNewUserInvitation(String toEmail, String inviterName, String groupName, String token, LocalDateTime expiresAt) {
+        String baseUrl = frontendUrlResolver.getBaseUrl();
         String subject = "You're invited to join \"" + groupName + "\" on SplitWiseMoney";
-        String registerUrl = baseUrl + "/register.html?invitationToken=" + token;
+        String registerUrl = baseUrl + "/register.html?invite=" + token + "&email=" + toEmail;
         String expiry = expiresAt != null ? expiresAt.format(FMT) : "7 days from now";
 
         String html = buildNewUserHtml(inviterName, groupName, registerUrl, expiry);

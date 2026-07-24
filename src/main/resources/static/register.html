@@ -33,7 +33,7 @@
                             <label for="fullName" class="form-label text-secondary">Full Name</label>
                             <div class="input-group">
                                 <span class="input-group-text form-glass border-end-0 bg-transparent text-secondary"><i class="fa-solid fa-user"></i></span>
-                                <input type="text" class="form-control form-glass border-start-0" id="fullName" placeholder="Rahul Kumar" required>
+                                <input type="text" class="form-control form-glass border-start-0" id="fullName" placeholder="John Doe" required>
                             </div>
                         </div>
 
@@ -41,7 +41,7 @@
                             <label for="email" class="form-label text-secondary">Email Address</label>
                             <div class="input-group">
                                 <span class="input-group-text form-glass border-end-0 bg-transparent text-secondary"><i class="fa-solid fa-envelope"></i></span>
-                                <input type="email" class="form-control form-glass border-start-0" id="email" placeholder="rahul@example.com" required>
+                                <input type="email" class="form-control form-glass border-start-0" id="email" placeholder="user@domain.com" required>
                             </div>
                         </div>
                         
@@ -71,6 +71,15 @@
     <!-- Frontend API Connection -->
     <script src="js/api.js"></script>
     <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const emailParam = urlParams.get('email');
+            if (emailParam) {
+                const emailInput = document.getElementById('email');
+                if (emailInput) emailInput.value = emailParam;
+            }
+        });
+
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const fullName = document.getElementById('fullName').value;
@@ -78,25 +87,34 @@
             const password = document.getElementById('password').value;
             const alertArea = document.getElementById('alertArea');
             
+            const urlParams = new URLSearchParams(window.location.search);
+            const inviteToken = urlParams.get('invite') || urlParams.get('invitationToken');
+
             alertArea.classList.add('d-none');
             alertArea.className = 'alert border-0 text-white d-none';
             
             try {
-                await API.post('/api/auth/register', { fullName, email, password }, false);
+                const response = await API.post('/api/auth/register', { fullName, email, password, invitationToken: inviteToken }, false);
                 
-                alertArea.textContent = 'Account created successfully! Redirecting to login...';
+                if (response.token) {
+                    API.setToken(response.token);
+                }
+
+                alertArea.textContent = 'Account created successfully! Auto-joining group...';
                 alertArea.style.backgroundColor = 'var(--accent-emerald)';
                 alertArea.classList.remove('d-none');
                 
-                const urlParams = new URLSearchParams(window.location.search);
-                const inviteToken = urlParams.get('invitationToken');
                 setTimeout(() => {
-                    if (inviteToken) {
-                        window.location.href = 'login.html?invitationToken=' + inviteToken;
+                    if (response.acceptedGroupId) {
+                        window.location.href = 'group-details.html?id=' + response.acceptedGroupId;
+                    } else if (inviteToken) {
+                        window.location.href = 'invite.html?token=' + inviteToken;
+                    } else if (response.token) {
+                        window.location.href = 'dashboard.html';
                     } else {
                         window.location.href = 'login.html';
                     }
-                }, 2000);
+                }, 1000);
             } catch (err) {
                 alertArea.textContent = err.message || 'Registration failed. Email may already be registered.';
                 alertArea.style.backgroundColor = 'var(--accent-rose)';

@@ -359,11 +359,11 @@ const App = {
 
                         setTimeout(() => { if (alertArea) alertArea.classList.add('d-none'); }, 5000);
                     } catch (err) {
-                        let msg = err.message || 'Unable to send invitation.';
+                        let errorDetail = err.message || 'Server error';
                         if (alertArea) {
                             alertArea.innerHTML = `
                                 <div class="d-flex align-items-center justify-content-between">
-                                    <span><i class="fa-solid fa-triangle-exclamation me-2"></i>${msg}</span>
+                                    <span><i class="fa-solid fa-triangle-exclamation me-2"></i>Failed to send invitation email (${errorDetail})</span>
                                     <button class="btn btn-sm btn-light py-0 ms-2 fw-semibold" id="btnRetryInvite">Retry</button>
                                 </div>
                             `;
@@ -1665,6 +1665,7 @@ const App = {
     async initInvitePage() {
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token');
+        const action = urlParams.get('action');
 
         if (!token) {
             alert('Invalid invitation token link.');
@@ -1672,50 +1673,106 @@ const App = {
             return;
         }
 
-        // Show details first (public API)
         const container = document.getElementById('inviteDetailsContainer');
-        if (!container) return;
+        const spinner = document.getElementById('inviteSpinner');
 
         try {
             const details = await API.get(`/api/invitations/${token}`, false);
-            
-            // Check auth status
-            const userToken = API.getToken();
-            if (!userToken) {
-                // If not logged in, redirect to login page preserving the token parameter
-                window.location.href = 'login.html?invitationToken=' + token;
+
+            if (spinner) spinner.classList.add('d-none');
+            if (container) container.classList.remove('d-none');
+
+            // Handle Already Accepted State
+            if (details.status === 'ACCEPTED') {
+                container.innerHTML = `
+                    <div class="text-center py-4">
+                        <div class="icon-glow mx-auto mb-3 bg-emerald-glow" style="width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(16,185,129,0.15);">
+                            <i class="fa-solid fa-users-check fs-2 text-success"></i>
+                        </div>
+                        <h3 class="text-white fw-bold">Already a Member</h3>
+                        <p class="text-secondary mb-4">You are already a member of <strong>${details.groupName}</strong>.</p>
+                        <a href="group-details.html?id=${details.groupId || ''}" class="btn btn-success w-100 py-3 fw-bold">
+                            <i class="fa-solid fa-folder-open me-2"></i>Go to Group Dashboard
+                        </a>
+                    </div>
+                `;
                 return;
             }
 
-            // Display invitation details
+            // Handle Declined State
+            if (details.status === 'REJECTED') {
+                container.innerHTML = `
+                    <div class="text-center py-4">
+                        <div class="icon-glow mx-auto mb-3" style="width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(239,68,68,0.15);">
+                            <i class="fa-solid fa-circle-xmark fs-2 text-danger"></i>
+                        </div>
+                        <h3 class="text-white fw-bold">Invitation Declined</h3>
+                        <p class="text-secondary mb-4">You have declined the invitation to join <strong>${details.groupName}</strong>.</p>
+                        <a href="dashboard.html" class="btn btn-secondary-outline w-100 py-3 fw-bold">
+                            <i class="fa-solid fa-house me-2"></i>Back to Dashboard
+                        </a>
+                    </div>
+                `;
+                return;
+            }
+
+            // Handle Expired State
+            if (details.status === 'EXPIRED') {
+                container.innerHTML = `
+                    <div class="text-center py-4">
+                        <div class="icon-glow mx-auto mb-3" style="width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(245,158,11,0.15);">
+                            <i class="fa-solid fa-clock-rotate-left fs-2 text-warning"></i>
+                        </div>
+                        <h3 class="text-white fw-bold">Invitation Expired</h3>
+                        <p class="text-secondary mb-4">This invitation link has expired (valid for 48 hours).</p>
+                        <a href="dashboard.html" class="btn btn-warning w-100 py-3 fw-bold text-dark">
+                            <i class="fa-solid fa-rotate me-2"></i>Request New Invitation
+                        </a>
+                    </div>
+                `;
+                return;
+            }
+
+            // Check Authentication Status
+            const userToken = API.getToken();
+            if (!userToken) {
+                if (details.isRegisteredUser) {
+                    window.location.href = `login.html?invitationToken=${token}&email=${encodeURIComponent(details.inviteeEmail || '')}`;
+                } else {
+                    window.location.href = `register.html?invite=${token}&email=${encodeURIComponent(details.inviteeEmail || '')}`;
+                }
+                return;
+            }
+
+            // Display Active Pending Invitation Details (Requires explicit human button click to mutate state)
+
+            // Display Active Pending Invitation Details
             document.getElementById('inviteGroupName').textContent = details.groupName;
             document.getElementById('inviteSender').textContent = details.inviterName;
-            document.getElementById('inviteMemberCount').textContent = details.groupMemberCount + ' member(s)';
-            
-            // Expiry date format
-            const expires = new Date(details.expiresAt).toLocaleDateString();
+            document.getElementById('inviteMemberCount').textContent = (details.groupMemberCount || 1) + ' member(s)';
+            const expires = details.expiresAt ? new Date(details.expiresAt).toLocaleString() : '48 hours from now';
             document.getElementById('inviteExpiry').textContent = expires;
 
-            // Setup buttons
             document.getElementById('btnAcceptInvite').onclick = () => App.acceptInviteToken(token);
             document.getElementById('btnRejectInvite').onclick = () => App.rejectInviteToken(token);
-            
-            // Remove loading spinner
-            container.classList.remove('d-none');
-            const spinner = document.getElementById('inviteSpinner');
-            if (spinner) spinner.classList.add('d-none');
 
         } catch (err) {
-            container.innerHTML = `
-                <div class="text-center py-5 text-danger">
-                    <i class="fa-solid fa-circle-exclamation fs-1 mb-3"></i>
-                    <h4 class="text-white fw-bold mb-2">Invitation Error</h4>
-                    <p class="text-secondary">${err.message || 'The invitation link is invalid or has expired.'}</p>
-                    <a href="dashboard.html" class="btn btn-secondary-outline mt-3">Back to Dashboard</a>
-                </div>
-            `;
-            const spinner = document.getElementById('inviteSpinner');
             if (spinner) spinner.classList.add('d-none');
+            if (container) {
+                container.classList.remove('d-none');
+                container.innerHTML = `
+                    <div class="text-center py-4">
+                        <div class="icon-glow mx-auto mb-3" style="width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(245,158,11,0.15);">
+                            <i class="fa-solid fa-clock-rotate-left fs-2 text-warning"></i>
+                        </div>
+                        <h3 class="text-white fw-bold mb-2">Invitation Link Expired</h3>
+                        <p class="text-secondary mb-4">${err.message || 'This invitation link is invalid or has expired.'}</p>
+                        <a href="dashboard.html" class="btn btn-warning w-100 py-3 fw-bold text-dark">
+                            <i class="fa-solid fa-rotate me-2"></i>Request New Invitation
+                        </a>
+                    </div>
+                `;
+            }
         }
     },
 
@@ -1728,11 +1785,15 @@ const App = {
         }
 
         try {
-            await API.post(`/api/invitations/${token}/accept`);
-            alert('Invitation accepted! Redirecting to dashboard...');
-            window.location.href = 'dashboard.html';
+            const res = await API.post(`/api/invitations/${token}/accept`);
+            const targetGroupId = res && res.groupId ? res.groupId : '';
+            if (targetGroupId) {
+                window.location.href = `group-details.html?id=${targetGroupId}`;
+            } else {
+                window.location.href = 'dashboard.html';
+            }
         } catch (err) {
-            alert('Failed to accept: ' + err.message);
+            alert('Unable to accept invitation: ' + err.message);
             if (btnAccept) {
                 btnAccept.disabled = false;
                 btnAccept.innerHTML = origText;
@@ -1750,10 +1811,25 @@ const App = {
 
         try {
             await API.post(`/api/invitations/${token}/reject`);
-            alert('Invitation declined. Redirecting to dashboard...');
-            window.location.href = 'dashboard.html';
+            const container = document.getElementById('inviteDetailsContainer');
+            if (container) {
+                container.innerHTML = `
+                    <div class="text-center py-4">
+                        <div class="icon-glow mx-auto mb-3" style="width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(239,68,68,0.15);">
+                            <i class="fa-solid fa-circle-xmark fs-2 text-danger"></i>
+                        </div>
+                        <h3 class="text-white fw-bold">Invitation Declined</h3>
+                        <p class="text-secondary mb-4">You have declined the invitation to join the group.</p>
+                        <a href="dashboard.html" class="btn btn-secondary-outline w-100 py-3 fw-bold">
+                            <i class="fa-solid fa-house me-2"></i>Back to Dashboard
+                        </a>
+                    </div>
+                `;
+            } else {
+                window.location.href = 'dashboard.html';
+            }
         } catch (err) {
-            alert('Failed to decline: ' + err.message);
+            alert('Unable to decline invitation: ' + err.message);
             if (btnReject) {
                 btnReject.disabled = false;
                 btnReject.innerHTML = origText;

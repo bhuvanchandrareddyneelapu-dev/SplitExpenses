@@ -56,14 +56,17 @@ public class InvitationController {
         }
 
         int memberCount = groupService.getGroupMembers(invitation.getGroup().getId()).size();
+        boolean isRegistered = userService.findByEmail(invitation.getInviteeEmail()).isPresent();
 
         InviteDetailResponse response = new InviteDetailResponse(
+                invitation.getGroup().getId(),
                 invitation.getGroup().getGroupName(),
                 memberCount,
                 invitation.getSender().getFullName(),
                 invitation.getInviteeEmail(),
                 invitation.getStatus(),
-                invitation.getExpiresAt()
+                invitation.getExpiresAt(),
+                isRegistered
         );
         return ResponseEntity.ok(response);
     }
@@ -75,18 +78,21 @@ public class InvitationController {
         User user = getAuthenticatedUser();
         if (user == null) return unauthorized();
 
-        groupService.acceptInvitationByToken(token, user);
-        return ResponseEntity.ok(java.util.Map.of("message", "Invitation accepted successfully"));
+        GroupInvitation inv = groupService.acceptInvitationByToken(token, user);
+        return ResponseEntity.ok(java.util.Map.of(
+                "message", "Invitation accepted successfully",
+                "groupId", inv.getGroup().getId()
+        ));
     }
 
     @PostMapping("/{token}/reject")
-    @SecurityRequirement(name = "bearerAuth")
-    @Operation(summary = "Reject a group invitation using token")
+    @Operation(summary = "Reject/decline a group invitation using token")
     public ResponseEntity<?> rejectInvitation(@PathVariable String token) {
         User user = getAuthenticatedUser();
-        if (user == null) return unauthorized();
-
-        groupService.rejectInvitationByToken(token, user);
-        return ResponseEntity.ok(java.util.Map.of("message", "Invitation rejected successfully"));
+        GroupInvitation inv = groupService.rejectInvitationByToken(token, user);
+        return ResponseEntity.ok(java.util.Map.of(
+                "message", "Invitation declined successfully",
+                "groupId", inv.getGroup().getId()
+        ));
     }
 }

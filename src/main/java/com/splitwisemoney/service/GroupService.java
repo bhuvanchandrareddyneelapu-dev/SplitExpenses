@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -248,8 +249,7 @@ public class GroupService {
         if (existing.isPresent()) {
             GroupInvitation inv = existing.get();
             if ("PENDING".equals(inv.getStatus()) && !inv.isExpired()) {
-                sendInvitationEmails(inv, actor, group, existingUser);
-                return inv;
+                throw new ResourceConflictException("An invitation is already pending for this email");
             }
 
             String newToken = invitationTokenService.generateToken();
@@ -257,6 +257,7 @@ public class GroupService {
             inv.setSender(actor);
             inv.setRespondedAt(null);
             inv.setInvitationToken(newToken);
+            inv.setTokenHash(invitationTokenService.hashToken(newToken));
             inv.setExpiresAt(invitationTokenService.calculateExpiryTime());
             existingUser.ifPresent(inv::setReceiver);
             GroupInvitation saved = groupInvitationRepository.save(inv);
@@ -273,6 +274,7 @@ public class GroupService {
             invitation = new GroupInvitation(group, actor, email);
         }
         invitation.setInvitationToken(token);
+        invitation.setTokenHash(invitationTokenService.hashToken(token));
         invitation.setExpiresAt(invitationTokenService.calculateExpiryTime());
 
         GroupInvitation saved = groupInvitationRepository.save(invitation);
@@ -290,30 +292,46 @@ public class GroupService {
             invitation = new GroupInvitation(group, actor, email);
         }
         invitation.setInvitationToken(token);
+        invitation.setTokenHash(invitationTokenService.hashToken(token));
         invitation.setExpiresAt(invitationTokenService.calculateExpiryTime());
         GroupInvitation saved = groupInvitationRepository.save(invitation);
         entityManager.flush();
         return saved;
     }
 
+    private static final Set<String> DISALLOWED_BOUNCE_DOMAINS = Set.of(
+            "invalid.com", "fake.com", "tempmail.com", "dispostable.com", "mailinator.com", "10minutemail.com"
+    );
+
     private void validateEmailFormat(String email) {
-        if (email == null || email.isBlank() || !email.contains("@") || !email.contains(".")) {
-            throw new IllegalArgumentException("Invalid email format");
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Email address is required.");
+        }
+
+        String cleanedEmail = email.trim().toLowerCase();
+
+        if (!org.apache.commons.validator.routines.EmailValidator.getInstance().isValid(cleanedEmail)) {
+            throw new IllegalArgumentException("Invalid email format: " + email);
+        }
+
+        String domain = cleanedEmail.substring(cleanedEmail.indexOf('@') + 1);
+        if (DISALLOWED_BOUNCE_DOMAINS.contains(domain)) {
+            throw new IllegalArgumentException("Cannot send invitation to invalid or bounce-prone domain: " + domain);
         }
     }
 
     private void sendInvitationEmails(GroupInvitation inv, User actor, Group group, Optional<User> existingUser) {
-        log.info("[GroupService] Calling JavaMailEmailService — inviteeEmail={} existingUser={}",
+        log.info("[GroupService] Dispatching invitation email via EmailService — inviteeEmail={} existingUser={}",
                  inv.getInviteeEmail(), existingUser.isPresent());
 
         if (existingUser.isPresent()) {
-            javaMailEmailService.sendRegisteredUserInvitation(inv, actor.getFullName(), group.getGroupName());
+            emailService.sendExistingUserInvitation(inv, actor.getFullName(), group.getGroupName());
             notificationService.createNotification(
                     existingUser.get(),
                     "GROUP_INVITE",
                     actor.getFullName() + " invited you to join the group \"" + group.getGroupName() + "\". Click to view.");
         } else {
-            javaMailEmailService.sendUnregisteredUserInvitation(inv, actor.getFullName(), group.getGroupName());
+            emailService.sendNewUserInvitation(inv, actor.getFullName(), group.getGroupName());
         }
         activityLogService.log(actor, "Invited " + inv.getInviteeEmail() + " to join " + group.getGroupName());
     }
@@ -377,9 +395,16 @@ public class GroupService {
     }
 
     @Transactional
-    public void acceptInvitationByToken(String token, User user) {
+    public GroupInvitation acceptInvitationByToken(String token, User user) {
         GroupInvitation invitation = groupInvitationRepository.findByInvitationToken(token)
                 .orElseThrow(() -> new InvalidTokenException("Invitation not found or invalid token."));
+
+        if ("ACCEPTED".equals(invitation.getStatus())) {
+            if (!groupMemberRepository.existsByGroupIdAndUserId(invitation.getGroup().getId(), user.getId())) {
+                groupMemberRepository.save(new GroupMember(invitation.getGroup(), user));
+            }
+            return invitation;
+        }
 
         validatePendingInvitation(invitation);
         validateInviteeEmail(invitation, user);
@@ -388,7 +413,7 @@ public class GroupService {
         invitation.setReceiver(user);
         invitation.setRespondedAt(LocalDateTime.now());
         invitation.setAcceptedAt(LocalDateTime.now());
-        groupInvitationRepository.save(invitation);
+        GroupInvitation saved = groupInvitationRepository.save(invitation);
 
         // Add as group member if not already
         if (!groupMemberRepository.existsByGroupIdAndUserId(invitation.getGroup().getId(), user.getId())) {
@@ -400,26 +425,39 @@ public class GroupService {
                 user.getFullName() + " accepted your invitation to join \"" + invitation.getGroup().getGroupName() + "\".");
         emailService.sendInvitationAccepted(
                 invitation.getSender().getEmail(), user.getFullName(), invitation.getGroup().getGroupName());
+
+        return saved;
     }
 
     @Transactional
-    public void rejectInvitationByToken(String token, User user) {
+    public GroupInvitation rejectInvitationByToken(String token, User user) {
         GroupInvitation invitation = groupInvitationRepository.findByInvitationToken(token)
                 .orElseThrow(() -> new InvalidTokenException("Invitation not found or invalid token."));
 
+        if ("REJECTED".equals(invitation.getStatus())) {
+            return invitation;
+        }
+
         validatePendingInvitation(invitation);
-        validateInviteeEmail(invitation, user);
+        if (user != null) {
+            validateInviteeEmail(invitation, user);
+            invitation.setReceiver(user);
+        }
 
         invitation.setStatus("REJECTED");
-        invitation.setReceiver(user);
         invitation.setRespondedAt(LocalDateTime.now());
-        groupInvitationRepository.save(invitation);
+        GroupInvitation saved = groupInvitationRepository.save(invitation);
 
-        activityLogService.log(user, "Declined invitation to join " + invitation.getGroup().getGroupName());
+        String responderName = (user != null) ? user.getFullName() : invitation.getInviteeEmail();
+        if (user != null) {
+            activityLogService.log(user, "Declined invitation to join " + invitation.getGroup().getGroupName());
+        }
         notificationService.createNotification(invitation.getSender(), "INVITE_REJECTED",
-                user.getFullName() + " declined your invitation to join \"" + invitation.getGroup().getGroupName() + "\".");
+                responderName + " declined your invitation to join \"" + invitation.getGroup().getGroupName() + "\".");
         emailService.sendInvitationRejected(
-                invitation.getSender().getEmail(), user.getFullName(), invitation.getGroup().getGroupName());
+                invitation.getSender().getEmail(), responderName, invitation.getGroup().getGroupName());
+
+        return saved;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -496,9 +534,11 @@ public class GroupService {
      * and auto-accepts them (adds them to the group).
      */
     @Transactional
-    public void autoAcceptPendingInvitations(User newUser) {
+    public Long autoAcceptPendingInvitations(User newUser) {
         List<GroupInvitation> pending = groupInvitationRepository
                 .findByInviteeEmailAndStatus(newUser.getEmail(), "PENDING");
+
+        Long firstAcceptedGroupId = null;
 
         for (GroupInvitation inv : pending) {
             if (inv.isExpired()) {
@@ -515,10 +555,16 @@ public class GroupService {
             inv.setAcceptedAt(LocalDateTime.now());
             groupInvitationRepository.save(inv);
 
+            if (firstAcceptedGroupId == null) {
+                firstAcceptedGroupId = inv.getGroup().getId();
+            }
+
             notificationService.createNotification(newUser, "GROUP_INVITE",
                     "You were automatically added to \"" + inv.getGroup().getGroupName() + "\" based on an invitation.");
             notificationService.createNotification(inv.getSender(), "INVITE_ACCEPTED",
                     newUser.getFullName() + " registered and joined \"" + inv.getGroup().getGroupName() + "\".");
         }
+
+        return firstAcceptedGroupId;
     }
 }

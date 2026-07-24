@@ -22,8 +22,8 @@ public interface GroupInvitationRepository extends JpaRepository<GroupInvitation
 
     // ── New token-based queries ──────────────────────────────────────────────
 
-    /** Look up invitation by UUID token, eagerly loading group and sender. */
-    @Query("SELECT gi FROM GroupInvitation gi JOIN FETCH gi.group g JOIN FETCH gi.sender s LEFT JOIN FETCH g.createdBy WHERE gi.invitationToken = :token")
+    /** Look up invitation by raw token or SHA-256 hash, eagerly loading group and sender. */
+    @Query("SELECT gi FROM GroupInvitation gi JOIN FETCH gi.group g JOIN FETCH gi.sender s LEFT JOIN FETCH g.createdBy WHERE gi.invitationToken = :token OR gi.tokenHash = :token")
     Optional<GroupInvitation> findByInvitationToken(@Param("token") String token);
 
     /** Check for an existing (any-status) invitation to a given email for a group. */

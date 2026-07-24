@@ -108,9 +108,9 @@ public class CompositeFallbackEmailProvider implements EmailProvider {
         }
 
         if (lastException == null) {
-            // No configured provider was attempted (e.g. mail is disabled in test/dev environment)
-            log.warn("[CompositeEmailProvider] ⚠️ SKIPPING DISPATCH for [{}] — No configured email provider available (mail disabled or missing credentials).", actionName);
-            return;
+            String msg = "No configured email provider available (MAIL_USERNAME/MAIL_PASSWORD missing or spring.mail.enabled=false). Failed to dispatch [" + actionName + "].";
+            log.error("[CompositeEmailProvider] ✗ {}", msg);
+            throw new MailSendException(msg);
         }
 
         String msg = "All configured email providers failed to deliver [" + actionName + "]. Last error: " + lastException.getMessage();

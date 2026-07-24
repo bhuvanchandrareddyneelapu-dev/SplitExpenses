@@ -8,8 +8,9 @@ public class InvitationEmailTemplate {
     /**
      * Generates responsive dark + purple HTML template for registered user invitation.
      */
-    public String buildRegisteredUserEmail(String inviteeName, String inviterName, String groupName, String acceptUrl) {
+    public String buildRegisteredUserEmail(String inviteeName, String inviterName, String groupName, String acceptUrl, String declineUrl, String expiryTime) {
         String greeting = (inviteeName != null && !inviteeName.isBlank()) ? "Hello " + esc(inviteeName) + "," : "Hello,";
+        String expiryText = (expiryTime != null) ? expiryTime : "48 hours from now";
 
         return "<!DOCTYPE html>"
                 + "<html>"
@@ -28,10 +29,11 @@ public class InvitationEmailTemplate {
                 + "<p style='color: #cbd5e1; font-size: 15px; line-height: 1.6; margin-bottom: 24px;'>"
                 + "<strong style='color: #ffffff;'>" + esc(inviterName) + "</strong> has invited you to join the expense sharing group: "
                 + "<strong style='color: #a5b4fc;'>" + esc(groupName) + "</strong>.</p>"
-                + "<p style='color: #cbd5e1; font-size: 15px; line-height: 1.6; margin-bottom: 32px;'>Click below to accept the invitation and view group expenses.</p>"
-                // CTA Button
-                + "<div style='text-align: center; margin-bottom: 32px;'>"
-                + "<a href='" + acceptUrl + "' style='display: inline-block; background-color: #6366f1; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-weight: 700; font-size: 16px; box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.4); transition: background-color 0.2s;'>Accept Invitation</a>"
+                + "<p style='color: #94a3b8; font-size: 14px; line-height: 1.6; margin-bottom: 32px;'>⏳ This invitation link is valid for <strong>48 hours</strong> (Expires: " + esc(expiryText) + ").</p>"
+                // CTA Buttons (Accept + Decline)
+                + "<div style='text-align: center; margin-bottom: 32px; display: flex; justify-content: center; gap: 12px;'>"
+                + "<a href='" + acceptUrl + "' style='display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 10px; font-weight: 700; font-size: 15px; box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.4); margin-right: 10px;'>✓ Accept & Join</a>"
+                + "<a href='" + declineUrl + "' style='display: inline-block; background-color: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); text-decoration: none; padding: 14px 24px; border-radius: 10px; font-weight: 600; font-size: 15px;'>Decline</a>"
                 + "</div>"
                 // Footer
                 + "<hr style='border: 0; border-top: 1px solid #334155; margin-bottom: 24px;' />"
@@ -46,7 +48,9 @@ public class InvitationEmailTemplate {
     /**
      * Generates responsive dark + purple HTML template for unregistered user invitation.
      */
-    public String buildUnregisteredUserEmail(String inviterName, String groupName, String signupUrl) {
+    public String buildUnregisteredUserEmail(String inviterName, String groupName, String signupUrl, String declineUrl, String expiryTime) {
+        String expiryText = (expiryTime != null) ? expiryTime : "48 hours from now";
+
         return "<!DOCTYPE html>"
                 + "<html>"
                 + "<head><meta charset='UTF-8'></head>"
@@ -64,10 +68,12 @@ public class InvitationEmailTemplate {
                 + "<p style='color: #cbd5e1; font-size: 15px; line-height: 1.6; margin-bottom: 24px;'>"
                 + "<strong style='color: #ffffff;'>" + esc(inviterName) + "</strong> invited you to join the expense sharing group: "
                 + "<strong style='color: #a5b4fc;'>" + esc(groupName) + "</strong>.</p>"
-                + "<p style='color: #cbd5e1; font-size: 15px; line-height: 1.6; margin-bottom: 24px;'>You don't have an account yet. Create your account using the button below to automatically join the group.</p>"
-                // CTA Button
-                + "<div style='text-align: center; margin-bottom: 32px;'>"
-                + "<a href='" + signupUrl + "' style='display: inline-block; background-color: #6366f1; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-weight: 700; font-size: 16px; box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.4); transition: background-color 0.2s;'>Create Account</a>"
+                + "<p style='color: #94a3b8; font-size: 14px; line-height: 1.6; margin-bottom: 24px;'>⏳ This invitation link is valid for <strong>48 hours</strong> (Expires: " + esc(expiryText) + ").</p>"
+                + "<p style='color: #cbd5e1; font-size: 15px; line-height: 1.6; margin-bottom: 32px;'>Create your account below to automatically accept and join the group.</p>"
+                // CTA Buttons
+                + "<div style='text-align: center; margin-bottom: 32px; display: flex; justify-content: center; gap: 12px;'>"
+                + "<a href='" + signupUrl + "' style='display: inline-block; background-color: #6366f1; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 10px; font-weight: 700; font-size: 15px; box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.4); margin-right: 10px;'>Create Account & Join</a>"
+                + "<a href='" + declineUrl + "' style='display: inline-block; background-color: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); text-decoration: none; padding: 14px 24px; border-radius: 10px; font-weight: 600; font-size: 15px;'>Decline</a>"
                 + "</div>"
                 // Footer
                 + "<hr style='border: 0; border-top: 1px solid #334155; margin-bottom: 24px;' />"

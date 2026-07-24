@@ -98,10 +98,10 @@ public class GlobalExceptionHandler {
     // 500 Internal Server Error
     // ──────────────────────────────────────────
 
-    @ExceptionHandler(SmtpDeliveryException.class)
-    public ResponseEntity<Object> handleSmtpDeliveryException(SmtpDeliveryException ex, WebRequest request) {
-        log.error("SMTP Delivery Error [{}]: {}", request.getDescription(false), ex.getMessage(), ex);
-        return errorBody(HttpStatus.INTERNAL_SERVER_ERROR, "SMTP Delivery Error", ex.getMessage());
+    @ExceptionHandler({SmtpDeliveryException.class, org.springframework.mail.MailException.class, jakarta.mail.MessagingException.class})
+    public ResponseEntity<Object> handleSmtpDeliveryException(Exception ex, WebRequest request) {
+        log.error("SMTP / Email Delivery Error [{}]: {}", request.getDescription(false), ex.getMessage(), ex);
+        return errorBody(HttpStatus.INTERNAL_SERVER_ERROR, "Email Delivery Error", "Failed to send invitation email: " + ex.getMessage());
     }
 
     /**

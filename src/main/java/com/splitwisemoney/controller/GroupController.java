@@ -176,42 +176,21 @@ public class GroupController {
         User user = getAuthenticatedUser();
         if (user == null) return unauthorized();
 
-        try {
-            com.splitwisemoney.entity.GroupInvitation invitation = groupService.inviteMemberByEmail(id, request.getEmail(), user);
-            InvitationResponse response = new InvitationResponse(
-                    invitation.getId(),
-                    invitation.getGroup().getId(),
-                    invitation.getGroup().getGroupName(),
-                    invitation.getSender().getFullName(),
-                    invitation.getStatus(),
-                    invitation.getCreatedAt(),
-                    invitation.getInvitationToken(),
-                    invitation.getInviteeEmail(),
-                    invitation.getExpiresAt(),
-                    invitation.getAcceptedAt(),
-                    invitation.getReceiver() == null
-            );
-            return ResponseEntity.ok(response);
-        } catch (MailException e) {
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                    .body(java.util.Map.of(
-                            "message", "Invitation saved but email delivery failed: " + e.getMessage(),
-                            "smtpError", true
-                    ));
-        } catch (RuntimeException e) {
-            // Safety net: catches any unexpected exception from the mail pipeline
-            // (e.g. a wrapped MessagingException that escaped as RuntimeException).
-            String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            if (msg.toLowerCase().contains("mail") || msg.toLowerCase().contains("smtp")
-                    || msg.toLowerCase().contains("message")) {
-                return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                        .body(java.util.Map.of(
-                                "message", "Invitation saved but email delivery failed: " + msg,
-                                "smtpError", true
-                        ));
-            }
-            throw e;  // re-throw non-mail exceptions
-        }
+        com.splitwisemoney.entity.GroupInvitation invitation = groupService.inviteMemberByEmail(id, request.getEmail(), user);
+        InvitationResponse response = new InvitationResponse(
+                invitation.getId(),
+                invitation.getGroup().getId(),
+                invitation.getGroup().getGroupName(),
+                invitation.getSender().getFullName(),
+                invitation.getStatus(),
+                invitation.getCreatedAt(),
+                invitation.getInvitationToken(),
+                invitation.getInviteeEmail(),
+                invitation.getExpiresAt(),
+                invitation.getAcceptedAt(),
+                invitation.getReceiver() == null
+        );
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{id}/invite/resend")

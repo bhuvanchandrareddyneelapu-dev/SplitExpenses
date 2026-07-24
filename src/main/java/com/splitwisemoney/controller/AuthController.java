@@ -1,8 +1,10 @@
 package com.splitwisemoney.controller;
 
 import com.splitwisemoney.dto.*;
+import com.splitwisemoney.entity.GroupInvitation;
 import com.splitwisemoney.entity.User;
 import com.splitwisemoney.security.JwtTokenProvider;
+import com.splitwisemoney.service.GroupService;
 import com.splitwisemoney.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,27 +23,51 @@ public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final UserService userService;
+    private final GroupService groupService;
     private final JwtTokenProvider tokenProvider;
 
-    public AuthController(AuthenticationManager authenticationManager, UserService userService, JwtTokenProvider tokenProvider) {
+    public AuthController(AuthenticationManager authenticationManager,
+                          UserService userService,
+                          GroupService groupService,
+                          JwtTokenProvider tokenProvider) {
         this.authenticationManager = authenticationManager;
         this.userService = userService;
+        this.groupService = groupService;
         this.tokenProvider = tokenProvider;
     }
 
     @PostMapping("/register")
-    @Operation(summary = "Register a new user account")
-    public ResponseEntity<UserProfile> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
+    @Operation(summary = "Register a new user account and auto-accept pending invitations")
+    public ResponseEntity<AuthResponse> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
         User user = userService.registerUser(
                 registerRequest.getFullName(),
                 registerRequest.getEmail(),
                 registerRequest.getPassword()
         );
-        return ResponseEntity.ok(new UserProfile(user.getId(), user.getFullName(), user.getEmail(), user.getCreatedAt()));
+
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(registerRequest.getEmail(), registerRequest.getPassword())
+        );
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        String jwt = tokenProvider.generateToken(authentication);
+
+        Long acceptedGroupId = null;
+        if (registerRequest.getInvitationToken() != null && !registerRequest.getInvitationToken().isBlank()) {
+            try {
+                GroupInvitation inv = groupService.acceptInvitationByToken(registerRequest.getInvitationToken().trim(), user);
+                acceptedGroupId = inv.getGroup().getId();
+            } catch (Exception ignored) {}
+        }
+
+        if (acceptedGroupId == null) {
+            acceptedGroupId = groupService.autoAcceptPendingInvitations(user);
+        }
+
+        return ResponseEntity.ok(new AuthResponse(jwt, acceptedGroupId));
     }
 
     @PostMapping("/login")
-    @Operation(summary = "Authenticate user and return JWT bearer token")
+    @Operation(summary = "Authenticate user and return JWT bearer token with accepted invitation group redirect")
     public ResponseEntity<AuthResponse> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -52,6 +78,22 @@ public class AuthController {
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = tokenProvider.generateToken(authentication);
-        return ResponseEntity.ok(new AuthResponse(jwt));
+
+        User user = userService.findByEmail(loginRequest.getEmail())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        Long acceptedGroupId = null;
+        if (loginRequest.getInvitationToken() != null && !loginRequest.getInvitationToken().isBlank()) {
+            try {
+                GroupInvitation inv = groupService.acceptInvitationByToken(loginRequest.getInvitationToken().trim(), user);
+                acceptedGroupId = inv.getGroup().getId();
+            } catch (Exception ignored) {}
+        }
+
+        if (acceptedGroupId == null) {
+            acceptedGroupId = groupService.autoAcceptPendingInvitations(user);
+        }
+
+        return ResponseEntity.ok(new AuthResponse(jwt, acceptedGroupId));
     }
 }
